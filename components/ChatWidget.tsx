@@ -1,260 +1,633 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Minimize2, Maximize2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { 
+  MessageCircle, X, Send, User, Mail, Phone, 
+  Minimize2, Paperclip, FileText, Loader2, Smile, Sparkles
+} from 'lucide-react'
 
-interface Message {
-  id: string;
-  content: string;
-  sender_type: 'cliente' | 'asesor';
-  created_at: string;
+// ============================================
+// 🎨 COLORES NICK RESORTS
+// ============================================
+const NICK_ORANGE = '#FF6B00'
+const NICK_GREEN = '#3DB54A'
+const NICK_GRADIENT = 'from-[#FF6B00] to-[#FF8C42]'
+const SLIME_GREEN = '#3DB54A'
+
+function getAgentGradient(color: string | undefined) {
+  const gradients: Record<string, string> = {
+    blue: 'from-blue-600 to-blue-700',
+    green: 'from-[#3DB54A] to-[#5DC85C]',
+    purple: 'from-purple-600 to-indigo-600',
+    pink: 'from-pink-600 to-rose-600',
+    orange: 'from-[#FF6B00] to-[#FF8C42]',
+    yellow: 'from-yellow-600 to-amber-600',
+    red: 'from-red-600 to-rose-600',
+    cyan: 'from-cyan-600 to-teal-600'
+  }
+  return gradients[color || 'orange'] || NICK_GRADIENT
 }
 
-interface ChatWidgetProps {
-  leadId?: string;
-  userEmail?: string;
-  userName?: string;
-  userPhone?: string;
-}
+// ============================================
+// 😊 LISTA DE EMOJIS COMUNES
+// ============================================
+const EMOJI_LIST = [
+  '😊', '😂', '❤️', '👍', '🙏', '🎉', '🔥', '💯', '✅', '⭐',
+  '🤔', '👋', '💪', '🙌', '👏', '💸', '💰', '📄', '📱', '💻',
+  '🏠', '🚗', '📈', '📉', '💡', '🔒', '⚠️', '❌', '✔️', 'ℹ️', '💚', '🧡'
+]
 
-export default function ChatWidget({ leadId, userEmail, userName, userPhone }: ChatWidgetProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
-  const [showForm, setShowForm] = useState(!userEmail);
-  const [formData, setFormData] = useState({
-    name: userName || '',
-    email: userEmail || '',
-    phone: userPhone || '',
-  });
+// ============================================
+// 🎨 FUNCIÓN PARA FORMATEAR TEXTO CON MARKDOWN
+// ============================================
+const formatMessage = (text: string) => {
+  if (!text) return text
   
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollInterval = useRef<NodeJS.Timeout | null>(null);
+  let formattedText = text
+  
+  formattedText = formattedText
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+  
+  formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+  formattedText = formattedText.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+  formattedText = formattedText.replace(/__([^_]+)__/g, '<u>$1</u>')
+  formattedText = formattedText.replace(/~~([^~]+)~~/g, '<del>$1</del>')
+  formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+  
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g
+  formattedText = formattedText.replace(urlRegex, (url) => {
+    const href = url.startsWith('www.') ? `https://${url}` : url
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline decoration-2 underline-offset-2 hover:opacity-80 break-all font-medium" style="color: inherit;">${url}</a>`
+  })
+  
+  formattedText = formattedText.replace(/\n/g, '<br>')
+  
+  return formattedText
+}
 
-  // Scroll al último mensaje
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+export default function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [step, setStep] = useState<'form' | 'chat'>('form')
+  const [messages, setMessages] = useState<any[]>([])
+  const [input, setInput] = useState('')
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [assignedAgent, setAssignedAgent] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: ''
+  })
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const emojiPickerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
-  // Crear conversación al iniciar
-  const createConversation = async () => {
-    try {
-      const res = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lead_id: leadId,
-          user_email: formData.email,
-          user_name: formData.name,
-          user_phone: formData.phone,
-        }),
-      });
+  const insertEmoji = (emoji: string) => {
+    setInput(prev => prev + emoji)
+    setShowEmojiPicker(false)
+    inputRef.current?.focus()
+  }
+
+  // ============================================
+  // AUTO-INICIO DESDE EMAIL O PARÁMETROS
+  // ============================================
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const urlParams = new URLSearchParams(window.location.search)
+      const chatName = urlParams.get('chat_name')
+      const chatEmail = urlParams.get('chat_email')
+      const conversationIdParam = urlParams.get('conversation_id')
       
-      const data = await res.json();
-      setConversationId(data.id);
-      return data.id;
-    } catch (error) {
-      console.error('Error creating conversation:', error);
-      return null;
-    }
-  };
-
-  // Cargar mensajes
-  const loadMessages = async (convId: string) => {
-    try {
-      const res = await fetch(`/api/messages?conversationId=${convId}`);
-      const data = await res.json();
-      setMessages(data);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  // Enviar mensaje
-  const sendMessage = async () => {
-    if (!input.trim() || !conversationId) return;
+      console.log('🔍 [Nick Chat] Parámetros:', { chatName, chatEmail, conversationId: conversationIdParam })
+      
+      if (chatName && chatEmail) {
+        if (conversationIdParam) {
+          console.log('📂 Cargando conversación existente:', conversationIdParam)
+          localStorage.setItem('nick_chat_conversation_id', conversationIdParam)
+          setConversationId(conversationIdParam)
+          
+          fetch(`/api/chat/messages?conversationId=${conversationIdParam}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                setMessages(data.messages)
+                setStep('chat')
+                setIsOpen(true)
+              }
+            })
+        } else {
+          console.log('📝 Sin conversationId, abriendo formulario')
+          setIsOpen(true)
+        }
+        
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    }, 300)
     
-    setIsLoading(true);
+    return () => clearTimeout(timer)
+  }, [])
+
+  // ============================================
+  // CARGAR DATOS GUARDADOS LOCALMENTE
+  // ============================================
+  useEffect(() => {
+    const savedName = localStorage.getItem('nick_chat_user_name')
+    const savedEmail = localStorage.getItem('nick_chat_user_email')
+    const savedPhone = localStorage.getItem('nick_chat_user_phone')
+    
+    if (savedName && savedEmail) {
+      setFormData({
+        name: savedName,
+        email: savedEmail,
+        phone: savedPhone || ''
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    const savedId = localStorage.getItem('nick_chat_conversation_id')
+    if (savedId && !conversationId) {
+      loadConversation(savedId)
+      setIsOpen(true)
+    }
+  }, [])
+
+  const loadConversation = async (id: string) => {
     try {
-      const res = await fetch('/api/messages', {
+      const res = await fetch(`/api/chat/messages?conversationId=${id}`)
+      const data = await res.json()
+      
+      if (data.success) {
+        setConversationId(id)
+        setMessages(data.messages)
+        setStep('chat')
+        if (data.conversation?.assignedTo) {
+          setAssignedAgent(data.conversation.assignedTo)
+        }
+      } else if (data.error === 'Conversation not found') {
+        console.log('🗑️ Conversación no encontrada, limpiando ID inválido')
+        localStorage.removeItem('nick_chat_conversation_id')
+        setConversationId(null)
+        setStep('form')
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error)
+    }
+  }
+
+  // ============================================
+  // INICIAR CONVERSACIÓN Y CREAR LEAD
+  // ============================================
+  const startConversation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.name || !formData.email) return
+
+    setIsLoading(true)
+    try {
+      localStorage.setItem('nick_chat_user_name', formData.name)
+      localStorage.setItem('nick_chat_user_email', formData.email)
+      localStorage.setItem('nick_chat_user_phone', formData.phone)
+
+      // Crear lead en la base de datos
+      const leadResponse = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          conversation_id: conversationId,
-          sender_type: 'cliente',
-          sender_name: formData.name,
-          content: input.trim(),
-        }),
-      });
+          full_name: formData.name,
+          email: formData.email,
+          phone: formData.phone || '',
+          destination: 'punta-cana',
+          arrival_date: new Date().toISOString().split('T')[0],
+          departure_date: new Date(Date.now() + 7*86400000).toISOString().split('T')[0],
+          adults: 1,
+          kids: 0,
+          message: `Cliente inició conversación por chat. Teléfono: ${formData.phone || 'No proporcionado'}`,
+          accept_promos: true,
+          status: 'PENDING'
+        })
+      })
+
+      const leadData = await leadResponse.json()
       
-      const newMessage = await res.json();
-      setMessages(prev => [...prev, newMessage]);
-      setInput('');
+      // Iniciar conversación en el chat
+      const res = await fetch('/api/chat/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          leadId: leadData.id
+        })
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        setConversationId(data.conversationId)
+        localStorage.setItem('nick_chat_conversation_id', data.conversationId)
+        
+        // Asignar asesor
+        const assignRes = await fetch('/api/chat/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationId: data.conversationId })
+        })
+        const assignData = await assignRes.json()
+        if (assignData.success) setAssignedAgent(assignData.agent)
+        
+        setStep('chat')
+        setMessages([{
+          id: 'welcome',
+          message: `✨ ¡Hola ${formData.name}! ✨\n\nBienvenido a **Nick Resorts** 🧡💚\n\nUn asesor **Nick** te atenderá en breve. Mientras tanto, cuéntanos ¿cómo podemos ayudarte con tus vacaciones de ensueño? 🏖️`,
+          senderType: 'system',
+          createdAt: new Date().toISOString()
+        }])
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
-  // Polling para nuevos mensajes
-  useEffect(() => {
-    if (conversationId && isOpen && !isMinimized) {
-      loadMessages(conversationId);
-      pollInterval.current = setInterval(() => {
-        loadMessages(conversationId);
-      }, 3000);
+  // ============================================
+  // ENVIAR MENSAJE
+  // ============================================
+  const sendMessage = async () => {
+    if (!input.trim() || !conversationId) return
+
+    const newMessage = {
+      id: Date.now().toString(),
+      message: input,
+      senderType: 'user',
+      createdAt: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, newMessage])
+    setInput('')
+
+    try {
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId,
+          message: input,
+          senderType: 'user'
+        })
+      })
+    } catch (error) {
+      console.error('Error sending message:', error)
+    }
+  }
+
+  // ============================================
+  // SUBIR ARCHIVOS
+  // ============================================
+  const uploadFile = async (file: File) => {
+    if (!conversationId) return
+
+    setIsUploading(true)
+    const formDataUpload = new FormData()
+    formDataUpload.append('file', file)
+    formDataUpload.append('conversationId', conversationId)
+
+    try {
+      const uploadRes = await fetch('/api/chat/upload', {
+        method: 'POST',
+        body: formDataUpload
+      })
+      const uploadData = await uploadRes.json()
       
-      return () => {
-        if (pollInterval.current) clearInterval(pollInterval.current);
-      };
+      if (uploadData.success) {
+        const isImage = file.type.startsWith('image/') || file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+        
+        const sendRes = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversationId,
+            message: isImage ? '' : `📎 ${file.name}`,
+            senderType: 'user',
+            fileUrl: uploadData.url,
+            fileType: uploadData.fileType,
+            fileName: file.name
+          })
+        })
+        
+        const sendData = await sendRes.json()
+        
+        if (sendData.success) {
+          const newMessage = {
+            id: sendData.message.id,
+            message: isImage ? '' : `📎 ${file.name}`,
+            senderType: 'user',
+            fileUrl: uploadData.url,
+            fileType: uploadData.fileType,
+            fileName: file.name,
+            createdAt: new Date().toISOString()
+          }
+          setMessages(prev => [...prev, newMessage])
+        }
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error)
+    } finally {
+      setIsUploading(false)
     }
-  }, [conversationId, isOpen, isMinimized]);
+  }
 
-  // Enviar formulario inicial
-  const handleSubmitForm = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.email) return;
+  // ============================================
+  // POLLING PARA ACTUALIZAR MENSAJES
+  // ============================================
+  useEffect(() => {
+    if (!conversationId || step !== 'chat') return
+
+    const pollMessages = async () => {
+      try {
+        const res = await fetch(`/api/chat/messages?conversationId=${conversationId}&_=${Date.now()}`)
+        const data = await res.json()
+        
+        if (data.success) {
+          setMessages(data.messages)
+        }
+      } catch (error) {
+        console.error('Error en polling:', error)
+      }
+    }
+
+    pollMessages()
+    const interval = setInterval(pollMessages, 2000)
+
+    return () => clearInterval(interval)
+  }, [conversationId, step])
+
+  const renderFilePreview = (msg: any) => {
+    if (!msg.fileUrl) return null
     
-    const convId = await createConversation();
-    if (convId) {
-      setShowForm(false);
-      await loadMessages(convId);
+    const fileName = msg.fileName || ''
+    const isImage = msg.fileType === 'image' || fileName.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+    const isPDF = msg.fileType === 'pdf' || fileName.endsWith('.pdf')
+    
+    if (isImage) {
+      return (
+        <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer" className="mt-2 block">
+          <img 
+            src={msg.fileUrl} 
+            alt={msg.fileName || 'Imagen'} 
+            className="max-w-full rounded-lg max-h-36 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+          />
+        </a>
+      )
     }
-  };
+    
+    return (
+      <a 
+        href={msg.fileUrl} 
+        target="_blank" 
+        rel="noopener noreferrer" 
+        className="mt-2 flex items-center gap-2 p-2 bg-gray-100 rounded-lg text-xs text-blue-600 hover:bg-gray-200 transition-colors"
+      >
+        {isPDF ? <FileText className="w-4 h-4" /> : <Paperclip className="w-4 h-4" />}
+        <span className="truncate flex-1">{msg.fileName || 'Documento'}</span>
+      </a>
+    )
+  }
 
+  // ============================================
+  // BOTÓN FLOTANTE (CERRADO)
+  // ============================================
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 bg-[#FF6B00] text-white p-4 rounded-full shadow-lg hover:scale-105 transition-all duration-200"
+        className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-50 bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white p-3 md:p-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group"
       >
-        <MessageCircle className="w-6 h-6" />
+        <MessageCircle className="w-5 h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform" />
+        <Sparkles className="absolute -top-1 -right-1 w-4 h-4 text-[#FFD700] animate-pulse" />
       </button>
-    );
+    )
   }
 
+  // ============================================
+  // WIDGET ABIERTO
+  // ============================================
   return (
-    <div className={`fixed bottom-6 right-6 z-50 bg-white rounded-2xl shadow-2xl transition-all duration-300 flex flex-col ${
-      isMinimized ? 'w-72 h-14' : 'w-96 h-[500px]'
-    }`}>
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] rounded-t-2xl">
-        <div>
-          <h3 className="font-bold text-white">Nick Resorts</h3>
-          <p className="text-xs text-white/80">Chat de soporte</p>
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 20 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 md:inset-auto md:bottom-6 md:right-6 z-50 md:w-[380px] md:h-[550px] bg-white md:rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
+      >
+        {/* HEADER con gradiente Naranja Nick */}
+        <div className={`bg-gradient-to-r ${getAgentGradient(assignedAgent?.color)} px-4 py-3 flex items-center justify-between shrink-0`}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-bold text-white text-sm md:text-base">Nick Resorts</h3>
+              {assignedAgent ? (
+                <p className="text-xs text-white/80">Asignado a: {assignedAgent.name}</p>
+              ) : (
+                <p className="text-xs text-white/80">🧡 Un asesor Nick te atenderá</p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-1">
+            <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+              <Minimize2 className="w-4 h-4 text-white" />
+            </button>
+            <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setIsMinimized(!isMinimized)}
-            className="text-white hover:text-gray-200 transition-colors"
-          >
-            {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="text-white hover:text-gray-200 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
 
-      {!isMinimized && (
-        <>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
-            {showForm ? (
-              <form onSubmit={handleSubmitForm} className="space-y-3">
-                <p className="text-sm text-gray-600 mb-3">Completa tus datos para comenzar</p>
-                <input
-                  type="text"
-                  placeholder="Tu nombre"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-[#FF6B00]"
-                  required
-                />
-                <input
-                  type="email"
-                  placeholder="Tu email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-[#FF6B00]"
-                  required
-                />
-                <input
-                  type="tel"
-                  placeholder="Tu teléfono (opcional)"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-[#FF6B00]"
-                />
-                <button
-                  type="submit"
-                  className="w-full bg-[#FF6B00] text-white font-bold py-2 rounded-lg hover:bg-[#E55A00] transition-colors"
-                >
-                  Iniciar Chat
-                </button>
-              </form>
-            ) : (
-              <>
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender_type === 'cliente' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[75%] p-3 rounded-2xl ${
-                        msg.sender_type === 'cliente'
-                          ? 'bg-[#FF6B00] text-white rounded-br-md'
-                          : 'bg-white border text-gray-700 rounded-bl-md shadow-sm'
-                      }`}
-                    >
-                      <p className="text-sm break-words">{msg.content}</p>
-                      <p className="text-[10px] opacity-70 mt-1">
-                        {new Date(msg.created_at).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+        {!isMinimized && (
+          <>
+            <div className="flex-1 flex flex-col min-h-0">
+              {step === 'form' ? (
+                isLoadingConversation ? (
+                  <div className="flex-1 flex items-center justify-center p-6">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#FF6B00] border-t-transparent mx-auto mb-3"></div>
+                      <p className="text-gray-500 text-sm">Conectando con tu asesor Nick...</p>
                     </div>
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
-              </>
-            )}
-          </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col justify-center">
+                    <div className="text-center mb-4 md:mb-6">
+                      <div className="w-12 h-12 md:w-16 md:h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <MessageCircle className="w-6 h-6 md:w-8 md:h-8 text-[#FF6B00]" />
+                      </div>
+                      <h4 className="font-bold text-base md:text-lg">¿Necesitas ayuda?</h4>
+                      <p className="text-xs md:text-sm text-gray-500">Déjanos tus datos y un asesor Nick te contactará</p>
+                    </div>
+                    <form onSubmit={startConversation} className="space-y-3">
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Tu nombre *" 
+                          value={formData.name} 
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                          required 
+                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
+                        />
+                      </div>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                          type="email" 
+                          placeholder="Tu correo *" 
+                          value={formData.email} 
+                          onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                          required 
+                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
+                        />
+                      </div>
+                      <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                          type="tel" 
+                          placeholder="Tu teléfono" 
+                          value={formData.phone} 
+                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
+                        />
+                      </div>
+                      <button 
+                        type="submit" 
+                        disabled={isLoading} 
+                        className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white py-2.5 rounded-xl font-semibold text-sm hover:from-[#E55A00] hover:to-[#FF6B00] transition-all disabled:opacity-50"
+                      >
+                        {isLoading ? 'Conectando...' : 'Iniciar conversación'}
+                      </button>
+                    </form>
+                  </div>
+                )
+              ) : (
+                <>
+                  {/* MENSAJES */}
+                  <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-gray-50">
+                    {messages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.senderType === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+                          msg.senderType === 'user' 
+                            ? 'bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white rounded-br-none' 
+                            : msg.senderType === 'system' 
+                            ? 'bg-gray-200 text-gray-500 italic' 
+                            : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
+                        }`}>
+                          {msg.message && (
+                            <span 
+                              dangerouslySetInnerHTML={{ __html: formatMessage(msg.message) }}
+                              className="break-words"
+                            />
+                          )}
+                          {renderFilePreview(msg)}
+                          <div className={`text-[10px] mt-1 ${msg.senderType === 'user' ? 'text-orange-100' : 'text-gray-400'}`}>
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {isUploading && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-100 p-3 rounded-lg flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin text-[#FF6B00]" />
+                          <span className="text-xs text-gray-500">Subiendo...</span>
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                  </div>
 
-          {/* Input */}
-          {!showForm && conversationId && (
-            <div className="p-4 border-t bg-white rounded-b-2xl">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Escribe tu mensaje..."
-                  className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:border-[#FF6B00]"
-                  disabled={isLoading}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={isLoading || !input.trim()}
-                  className="bg-[#FF6B00] text-white p-2 rounded-full hover:bg-[#E55A00] transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </div>
+                  {/* INPUT */}
+                  <div className="border-t p-3 flex gap-2 bg-white shrink-0">
+                    <input type="file" ref={fileInputRef} accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { if (e.target.files?.[0]) { uploadFile(e.target.files[0]); e.target.value = '' } }} />
+                    <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-[#FF6B00] hover:bg-orange-50 rounded-xl transition-colors">
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="flex-1 bg-gray-100 rounded-3xl px-4 py-2 relative">
+                      <input 
+                        ref={inputRef} 
+                        type="text" 
+                        value={input} 
+                        onChange={(e) => setInput(e.target.value)} 
+                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()} 
+                        placeholder="Escribe tu mensaje..." 
+                        className="w-full bg-transparent text-sm outline-none placeholder-gray-500 pr-8" 
+                      />
+                      
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2" ref={emojiPickerRef}>
+                        <button
+                          type="button"
+                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+                        >
+                          <Smile className="w-4 h-4 text-gray-500" />
+                        </button>
+                        
+                        {showEmojiPicker && (
+                          <div className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 p-2 w-64 z-50">
+                            <div className="grid grid-cols-8 gap-1">
+                              {EMOJI_LIST.map((emoji, index) => (
+                                <button
+                                  key={index}
+                                  onClick={() => insertEmoji(emoji)}
+                                  className="p-1.5 text-xl hover:bg-gray-100 rounded transition-colors"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <button onClick={sendMessage} disabled={!input.trim()} className="bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white p-2 rounded-xl hover:from-[#E55A00] hover:to-[#FF6B00] transition-colors disabled:opacity-50">
+                      <Send className="w-4 h-4" />
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          )}
-        </>
-      )}
-    </div>
-  );
+            
+            {/* FOOTER */}
+            <div className="bg-gray-50 px-4 py-2 border-t text-center shrink-0">
+              <p className="text-[10px] text-gray-400">💚🧡 Nick Resorts - Donde los sueños se vuelven slime</p>
+            </div>
+          </>
+        )}
+      </motion.div>
+    </AnimatePresence>
+  )
 }
