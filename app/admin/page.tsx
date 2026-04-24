@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
 import { Download, Check, AlertCircle, Loader2, InboxIcon, Eye, Phone, Mail, Calendar, MapPin } from "lucide-react"
 
 interface Lead {
@@ -30,7 +29,6 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   const ADMIN_PASSWORD = "nickadmin2025"
 
@@ -56,14 +54,12 @@ export default function AdminPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const { data, error: supabaseError } = await supabase
-        .from("leads")
-        .select("*")
-        .order("created_at", { ascending: false })
-
-      if (supabaseError) throw supabaseError
-
-      setLeads(data || [])
+      const response = await fetch('/api/leads')
+      const data = await response.json()
+      
+      if (!response.ok) throw new Error(data.error || 'Error al cargar leads')
+      
+      setLeads(data)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Error al cargar leads"
       setError(errorMessage)
@@ -76,13 +72,14 @@ export default function AdminPage() {
   const markAsContacted = async (leadId: string) => {
     setUpdatingId(leadId)
     try {
-      const { error: supabaseError } = await supabase
-        .from("leads")
-        .update({ status: "contactado" })
-        .eq("id", leadId)
-
-      if (supabaseError) throw supabaseError
-
+      const response = await fetch('/api/leads', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: leadId, status: 'contactado' })
+      })
+      
+      if (!response.ok) throw new Error('Error al actualizar')
+      
       setLeads((prev) =>
         prev.map((lead) => (lead.id === leadId ? { ...lead, status: "contactado" } : lead))
       )
@@ -97,19 +94,8 @@ export default function AdminPage() {
     if (leads.length === 0) return
 
     const headers = [
-      "Fecha",
-      "Nombre",
-      "Email",
-      "Teléfono",
-      "Destino",
-      "Aeropuerto Salida",
-      "Llegada",
-      "Salida",
-      "Adultos",
-      "Niños",
-      "Mensaje",
-      "Recibe Promos",
-      "Estado",
+      "Fecha", "Nombre", "Email", "Teléfono", "Destino", "Aeropuerto Salida",
+      "Llegada", "Salida", "Adultos", "Niños", "Mensaje", "Recibe Promos", "Estado"
     ]
 
     const rows = leads.map((lead) => [
@@ -198,7 +184,6 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-8 flex justify-between items-center flex-wrap gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-black mb-2" style={{ color: "#FF6B00" }}>
@@ -214,13 +199,10 @@ export default function AdminPage() {
           </button>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#FF6B00]">
             <p className="text-gray-600 font-semibold text-sm mb-1">Total de Leads</p>
-            <p className="text-3xl font-black" style={{ color: "#FF6B00" }}>
-              {leads.length}
-            </p>
+            <p className="text-3xl font-black" style={{ color: "#FF6B00" }}>{leads.length}</p>
           </div>
           <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#3DB54A]">
             <p className="text-gray-600 font-semibold text-sm mb-1">Contactados</p>
@@ -242,7 +224,6 @@ export default function AdminPage() {
           </div>
         </div>
 
-        {/* Error Message */}
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
             <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -253,26 +234,23 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex flex-wrap gap-3 mb-8">
           <button
             onClick={exportToCSV}
             disabled={leads.length === 0 || isLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded-lg transition-colors duration-200"
+            className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-bold rounded-lg transition-colors"
           >
-            <Download className="w-4 h-4" />
-            Exportar a CSV
+            <Download className="w-4 h-4" /> Exportar a CSV
           </button>
           <button
             onClick={fetchLeads}
             disabled={isLoading}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold rounded-lg transition-colors duration-200"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-bold rounded-lg transition-colors"
           >
             {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Actualizar Lista"}
           </button>
         </div>
 
-        {/* Table */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center py-16">
@@ -283,7 +261,7 @@ export default function AdminPage() {
               <InboxIcon className="w-16 h-16 text-gray-300 mb-4" />
               <p className="text-lg font-bold text-gray-600 mb-2">No hay leads registrados</p>
               <p className="text-gray-500 text-center max-w-md">
-                Aún no se han recibido reservaciones. Los leads aparecerán aquí cuando los usuarios completen el formulario de reserva.
+                Aún no se han recibido reservaciones. Los leads aparecerán aquí cuando los usuarios completen el formulario.
               </p>
             </div>
           ) : (
@@ -303,10 +281,7 @@ export default function AdminPage() {
                 </thead>
                 <tbody>
                   {leads.map((lead) => (
-                    <tr
-                      key={lead.id}
-                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
-                    >
+                    <tr key={lead.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 text-gray-900 font-medium">
                         {new Date(lead.created_at).toLocaleDateString("es-ES")}
                       </td>
@@ -314,8 +289,7 @@ export default function AdminPage() {
                         <div className="font-semibold text-gray-900">{lead.full_name}</div>
                         {lead.aeropuerto_salida && (
                           <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {lead.aeropuerto_salida}
+                            <MapPin className="w-3 h-3" /> {lead.aeropuerto_salida}
                           </div>
                         )}
                       </td>
@@ -325,39 +299,24 @@ export default function AdminPage() {
                           <span className="truncate max-w-[150px]">{lead.email}</span>
                         </div>
                         <div className="flex items-center gap-1 text-gray-700 text-sm mt-1">
-                          <Phone className="w-3 h-3 text-gray-400" />
-                          {lead.phone}
+                          <Phone className="w-3 h-3 text-gray-400" /> {lead.phone}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-900 font-medium">
                         {lead.destination === "punta-cana" ? "Punta Cana" : "Riviera Maya"}
                       </td>
                       <td className="px-6 py-4 text-gray-700 text-xs">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-gray-400" />
-                          {lead.arrival_date}
-                        </div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Calendar className="w-3 h-3 text-gray-400" />
-                          {lead.departure_date}
-                        </div>
+                        <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.arrival_date}</div>
+                        <div className="flex items-center gap-1 mt-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.departure_date}</div>
                       </td>
                       <td className="px-6 py-4 text-gray-900">
-                        <div className="text-sm">
-                          👤 {lead.adults} {lead.adults === 1 ? "adulto" : "adultos"}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          👶 {lead.kids} {lead.kids === 1 ? "niño" : "niños"}
-                        </div>
+                        <div>👤 {lead.adults} {lead.adults === 1 ? "adulto" : "adultos"}</div>
+                        <div className="text-gray-500">👶 {lead.kids} {lead.kids === 1 ? "niño" : "niños"}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
-                            lead.status === "contactado"
-                              ? "bg-green-100 text-green-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${
+                          lead.status === "contactado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                        }`}>
                           {lead.status === "contactado" ? "✓ Contactado" : "⏳ Pendiente"}
                         </span>
                       </td>
@@ -366,31 +325,20 @@ export default function AdminPage() {
                           <button
                             onClick={() => markAsContacted(lead.id)}
                             disabled={updatingId === lead.id}
-                            className="flex items-center justify-center gap-1 mx-auto px-4 py-2 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-gray-300 text-white text-xs font-bold rounded-lg transition-colors duration-200"
+                            className="px-4 py-2 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-gray-300 text-white text-xs font-bold rounded-lg"
                           >
-                            {updatingId === lead.id ? (
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                            ) : (
-                              <>
-                                <Check className="w-3 h-3" />
-                                Marcar
-                              </>
-                            )}
+                            {updatingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Marcar"}
                           </button>
                         )}
-                        {lead.status === "contactado" && (
-                          <span className="text-xs text-green-600 font-medium">Completado</span>
-                        )}
-                       </td>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
-              </table>
+               </table>
             </div>
           )}
         </div>
 
-        {/* Footer note */}
         <div className="mt-6 text-center text-xs text-gray-400">
           <p>Nick Resorts — Panel de Administración</p>
           <p>Total de leads: {leads.length} | Última actualización: {new Date().toLocaleString()}</p>
