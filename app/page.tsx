@@ -8,7 +8,7 @@ import { Moments } from "@/components/moments"
 import { Restaurants } from "@/components/restaurants"
 import { Offers } from "@/components/offers"
 import { Footer } from "@/components/footer"
-import { WhatsAppButton } from "@/components/whatsapp-button"
+import ChatWidget from '@/components/ChatWidget';
 import { Loader } from "@/components/loader"
 import { ReservationModal } from "@/components/reservation-modal"
 import { ReservationContext } from "@/context/reservation-context"
@@ -38,7 +38,7 @@ export default function HomePage() {
           <Offers />
         </main>
         <Footer />
-        <WhatsAppButton />
+        <ChatWidget />
         <ReservationModal isOpen={isReservationOpen} onClose={() => setIsReservationOpen(false)} />
       </>
     </ReservationContext.Provider>
