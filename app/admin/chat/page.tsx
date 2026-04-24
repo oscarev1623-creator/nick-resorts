@@ -1,14 +1,18 @@
 "use client"
 
-import { useState, useEffect, useRef } from 'react'
+import { Suspense, useState, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { MessageCircle, User, Clock, CheckCircle, ArrowLeft, Users, Filter, X, Trash2, RefreshCw, Search } from 'lucide-react'
+import { 
+  MessageCircle, User, Clock, CheckCircle, ArrowLeft, Users, Filter, 
+  X, Trash2, RefreshCw, Search
+} from 'lucide-react'
 
 const NICK_ORANGE = '#FF6B00'
 const NICK_GREEN = '#3DB54A'
 
-export default function AdminChatPage() {
+// Componente interno que usa useSearchParams
+function AdminChatContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [conversations, setConversations] = useState<any[]>([])
@@ -427,7 +431,7 @@ export default function AdminChatPage() {
                     <div className="text-right ml-2">
                       <div className="mb-1">{getStatusBadge(conv.status)}</div>
                       <p className="text-xs text-gray-400">
-                        {new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute:2-digit' })}
+                        {new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
                   </div>
@@ -451,5 +455,18 @@ export default function AdminChatPage() {
         )}
       </div>
     </div>
+  )
+}
+
+// Componente principal con Suspense
+export default function AdminChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#FF6B00] border-t-transparent"></div>
+      </div>
+    }>
+      <AdminChatContent />
+    </Suspense>
   )
 }
