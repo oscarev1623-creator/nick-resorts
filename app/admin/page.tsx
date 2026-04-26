@@ -26,9 +26,29 @@ interface Lead {
   status?: string
 }
 
-// Componente Sidebar
+// Componente Sidebar mejorado
 function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  // Obtener mensajes no leídos
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch('/api/chat/conversations')
+        const data = await res.json()
+        if (data.success) {
+          const total = data.conversations.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0)
+          setUnreadCount(total)
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error)
+      }
+    }
+    fetchUnreadCount()
+    const interval = setInterval(fetchUnreadCount, 5000)
+    return () => clearInterval(interval)
+  }, [])
   
   const navItems = [
     { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
@@ -47,20 +67,26 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
         md:translate-x-0 md:w-64 md:relative
         ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full'}
       `}>
+        {/* Logo y título */}
         <div className="p-6 border-b">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-r from-[#FF6B00] to-[#3DB54A] rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">NR</span>
             </div>
-            <h2 className="text-xl font-black text-[#FF6B00]">Nick Resorts</h2>
+            <div>
+              <h2 className="text-xl font-black text-[#FF6B00]">Nick Resorts</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Panel de Admin</p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mt-1">Panel de Admin</p>
         </div>
         
+        {/* Navegación principal */}
         <nav className="p-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            const isActive = pathname === item.href || (item.href === "/admin" && pathname === "/admin")
+            const isChat = item.name === "Chat"
+            
             return (
               <Link
                 key={item.name}
@@ -69,24 +95,53 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
                   ${isActive 
-                    ? 'bg-[#FF6B00]/10 text-[#FF6B00] font-semibold' 
+                    ? 'bg-[#FF6B00]/10 text-[#FF6B00] font-semibold shadow-sm' 
                     : 'text-gray-700 hover:bg-gray-100'
                   }
+                  ${isChat ? 'hover:bg-orange-50' : ''}
                 `}
               >
                 <Icon className={`w-5 h-5 ${isActive ? 'text-[#FF6B00]' : 'text-gray-500'}`} />
-                <span>{item.name}</span>
+                <span className="flex-1">{item.name}</span>
+                
+                {/* Badge de notificaciones para Chat */}
+                {isChat && unreadCount > 0 && (
+                  <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
+                    {unreadCount}
+                  </span>
+                )}
               </Link>
             )
           })}
         </nav>
         
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+        {/* Sección de acceso rápido */}
+        <div className="px-4 py-3 mt-2">
+          <div className="bg-gradient-to-r from-[#FF6B00]/10 to-[#3DB54A]/10 rounded-xl p-3">
+            <p className="text-xs text-gray-500 mb-2">Acceso rápido</p>
+            <Link
+              href="/admin/chat"
+              onClick={onClose}
+              className="flex items-center gap-2 text-sm text-[#FF6B00] font-medium hover:underline"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Ir al Chat
+              {unreadCount > 0 && (
+                <span className="ml-auto text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
+                  {unreadCount}
+                </span>
+              )}
+            </Link>
+          </div>
+        </div>
+        
+        {/* Cerrar Sesión */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
           <button 
             onClick={() => {
               window.location.href = "/admin?logout=true"
             }}
-            className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg w-full transition-colors"
+            className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg w-full transition-colors"
           >
             <LogOut className="w-5 h-5 text-gray-500" />
             <span>Cerrar Sesión</span>
@@ -389,61 +444,61 @@ export default function AdminPage() {
                       <th className="px-4 py-3 text-center font-bold text-gray-700">Acción</th>
                     </tr>
                   </thead>
-<tbody>
-  {leads.map((lead) => (
-    <tr key={lead.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-      <td className="px-4 py-3 text-gray-900 font-medium">
-        {new Date(lead.created_at).toLocaleDateString("es-ES")}
-      </td>
-      <td className="px-4 py-3">
-        <div className="font-semibold text-gray-900">{lead.full_name}</div>
-        {lead.aeropuerto_salida && (
-          <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-            <MapPin className="w-3 h-3" /> {lead.aeropuerto_salida}
-          </div>
-        )}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-1 text-gray-700 text-xs">
-          <Mail className="w-3 h-3 text-gray-400" />
-          <span className="truncate max-w-[120px]">{lead.email}</span>
-        </div>
-        <div className="flex items-center gap-1 text-gray-700 text-xs mt-1">
-          <Phone className="w-3 h-3 text-gray-400" /> {lead.phone}
-        </div>
-      </td>
-      <td className="px-4 py-3 text-gray-900 font-medium text-sm">
-        {lead.destination === "punta-cana" ? "Punta Cana" : "Riviera Maya"}
-      </td>
-      <td className="px-4 py-3 text-gray-700 text-xs">
-        <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.arrival_date}</div>
-        <div className="flex items-center gap-1 mt-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.departure_date}</div>
-      </td>
-      <td className="px-4 py-3 text-gray-900 text-sm">
-        <div>👤 {lead.adults} {lead.adults === 1 ? "adulto" : "adultos"}</div>
-        <div className="text-gray-500">👶 {lead.kids} {lead.kids === 1 ? "niño" : "niños"}</div>
-      </td>
-      <td className="px-4 py-3">
-        <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
-          lead.status === "contactado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-        }`}>
-          {lead.status === "contactado" ? "✓ Contactado" : "⏳ Pendiente"}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-center">
-        {lead.status !== "contactado" && (
-          <button
-            onClick={() => markAsContacted(lead.id)}
-            disabled={updatingId === lead.id}
-            className="px-3 py-1.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-gray-300 text-white text-xs font-bold rounded-lg transition-colors"
-          >
-            {updatingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Marcar"}
-          </button>
-        )}
-      </td>
-    </tr>
-  ))}
-</tbody>
+                  <tbody>
+                    {leads.map((lead) => (
+                      <tr key={lead.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-gray-900 font-medium">
+                          {new Date(lead.created_at).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{lead.full_name}</div>
+                          {lead.aeropuerto_salida && (
+                            <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                              <MapPin className="w-3 h-3" /> {lead.aeropuerto_salida}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 text-gray-700 text-xs">
+                            <Mail className="w-3 h-3 text-gray-400" />
+                            <span className="truncate max-w-[120px]">{lead.email}</span>
+                          </div>
+                          <div className="flex items-center gap-1 text-gray-700 text-xs mt-1">
+                            <Phone className="w-3 h-3 text-gray-400" /> {lead.phone}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 font-medium text-sm">
+                          {lead.destination === "punta-cana" ? "Punta Cana" : "Riviera Maya"}
+                        </td>
+                        <td className="px-4 py-3 text-gray-700 text-xs">
+                          <div className="flex items-center gap-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.arrival_date}</div>
+                          <div className="flex items-center gap-1 mt-1"><Calendar className="w-3 h-3 text-gray-400" /> {lead.departure_date}</div>
+                        </td>
+                        <td className="px-4 py-3 text-gray-900 text-sm">
+                          <div>👤 {lead.adults} {lead.adults === 1 ? "adulto" : "adultos"}</div>
+                          <div className="text-gray-500">👶 {lead.kids} {lead.kids === 1 ? "niño" : "niños"}</div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
+                            lead.status === "contactado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
+                          }`}>
+                            {lead.status === "contactado" ? "✓ Contactado" : "⏳ Pendiente"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {lead.status !== "contactado" && (
+                            <button
+                              onClick={() => markAsContacted(lead.id)}
+                              disabled={updatingId === lead.id}
+                              className="px-3 py-1.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-gray-300 text-white text-xs font-bold rounded-lg transition-colors"
+                            >
+                              {updatingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Marcar"}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
                 </table>
               </div>
             )}

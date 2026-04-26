@@ -88,7 +88,7 @@ function AdminChatContent() {
     }
     
     if (selectedAgent !== 'all') {
-      filtered = filtered.filter(conv => conv.assignedTo?.id === selectedAgent);
+      filtered = filtered.filter(conv => conv.assignedTo === selectedAgent);
     }
     
     setFilteredConversations(filtered);
@@ -110,7 +110,7 @@ function AdminChatContent() {
 
   const fetchAgents = async () => {
     try {
-      const res = await fetch('/api/admin/agents');
+      const res = await fetch('/api/agents');
       const data = await res.json();
       if (data.success) {
         setAgents(data.agents);
@@ -163,13 +163,18 @@ function AdminChatContent() {
     }
     
     try {
-      const res = await fetch('/api/chat/conversations', {
+      // Cambiado de /api/chat/conversations a /api/conversations
+      const res = await fetch('/api/conversations', {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
       const data = await res.json();
       
-      if (data.success) {
+      // La respuesta es un array directamente, no tiene propiedad .success
+      if (Array.isArray(data)) {
+        setConversations(data);
+        setLastRefreshTime(new Date());
+      } else if (data.success && data.conversations) {
         setConversations(data.conversations);
         setLastRefreshTime(new Date());
       }
@@ -349,7 +354,7 @@ function AdminChatContent() {
             </div>
           </button>
           {agents.map((agent) => {
-            const agentConversations = conversations.filter(c => c.assignedTo?.id === agent.id);
+            const agentConversations = conversations.filter(c => c.assignedTo === agent.id);
             const agentUnread = agentConversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
             const agentColor = getAgentColor(agent.color);
             return (

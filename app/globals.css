@@ -421,7 +421,7 @@
 }
 
 /* ============================================ */
-/* 🔥 CHAT - NEGRITA Y ESTILOS */
+/* 🔥 NEGRITA EN MENSAJES DE CHAT - NICK RESORTS */
 /* ============================================ */
 
 strong, b {
@@ -429,14 +429,22 @@ strong, b {
 }
 
 /* Mensajes del usuario (naranja) */
-[class*="bg-\\[\\#FF6B00\\]"] strong,
-.bg-\\[\\#FF6B00\\] b,
 [class*="bg-orange"] strong,
 [class*="bg-orange"] b,
 .whitespace-pre-wrap strong,
 .whitespace-pre-wrap b {
   font-weight: 700 !important;
 }
+
+/* Mensajes del agente/sistema */
+.bg-gray-100 strong,
+.bg-gray-100 b,
+.bg-white strong,
+.bg-white b {
+  font-weight: 700 !important;
+  color: #1a1a1a !important;
+}
+
 
 em, i {
   font-style: italic !important;
