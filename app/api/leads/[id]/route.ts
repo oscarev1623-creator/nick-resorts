@@ -3,12 +3,15 @@ import sql from '@/lib/neon';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ await params
+    const { id } = await params;
+    
     await sql`
       DELETE FROM leads 
-      WHERE id = ${params.id}::uuid
+      WHERE id = ${id}::uuid
     `;
     
     return NextResponse.json({ success: true });

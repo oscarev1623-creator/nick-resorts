@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
-  Download, Check, AlertCircle, Loader2, InboxIcon, Phone, Mail, Calendar, MapPin,
+  Download, AlertCircle, Loader2, InboxIcon, Phone, Mail, Calendar, MapPin,
   LayoutDashboard, Users, MessageCircle, LogOut, Menu, X, Trash2
 } from "lucide-react"
 
@@ -26,12 +26,11 @@ interface Lead {
   status?: string
 }
 
-// Componente Sidebar mejorado
+// Componente Sidebar
 function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname()
   const [unreadCount, setUnreadCount] = useState(0)
 
-  // Obtener mensajes no leídos
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
@@ -162,7 +161,6 @@ export default function AdminPage() {
 
   const ADMIN_PASSWORD = "nickadmin2025"
 
-  // Verificar logout
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
@@ -210,7 +208,6 @@ export default function AdminPage() {
     }
   }
 
-  // Actualizar estado del lead
   const updateLeadStatus = async (leadId: string, newStatus: string) => {
     setUpdatingId(leadId)
     try {
@@ -232,7 +229,6 @@ export default function AdminPage() {
     }
   }
 
-  // Eliminar lead
   const deleteLead = async (leadId: string) => {
     if (!confirm('¿Eliminar este lead permanentemente?')) return
     
@@ -380,11 +376,11 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#FF6B00]">
               <p className="text-gray-600 font-semibold text-sm mb-1">Total de Leads</p>
-              <p className="text-3xl font-black" style={{ color: "#FF6B00" }}>{leads.length}</p>
+              <p className="text-3xl font-black text-[#FF6B00]">{leads.length}</p>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-[#3DB54A]">
               <p className="text-gray-600 font-semibold text-sm mb-1">Contactados</p>
-              <p className="text-3xl font-black" style={{ color: "#3DB54A" }}>
+              <p className="text-3xl font-black text-[#3DB54A]">
                 {leads.filter((l) => l.status === "contactado").length}
               </p>
             </div>
@@ -402,7 +398,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
@@ -413,25 +408,23 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* Actions */}
           <div className="flex flex-wrap gap-3 mb-6">
             <button
               onClick={exportToCSV}
               disabled={leads.length === 0 || isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm"
             >
               <Download className="w-4 h-4" /> Exportar a CSV
             </button>
             <button
               onClick={fetchLeads}
               disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold rounded-lg transition-colors text-sm"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold rounded-lg text-sm"
             >
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Actualizar Lista"}
             </button>
           </div>
 
-          {/* Table */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {isLoading ? (
               <div className="flex items-center justify-center py-16">

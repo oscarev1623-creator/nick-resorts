@@ -91,6 +91,21 @@ export default function ChatWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
 
+  // ============================================
+  // FUNCIÓN PARA RESETEAR EL WIDGET
+  // ============================================
+  const resetToForm = () => {
+    console.log('🔄 Reseteando widget a formulario')
+    localStorage.removeItem('nick_chat_conversation_id')
+    setConversationId(null)
+    setStep('form')
+    setMessages([])
+    setAssignedAgent(null)
+  }
+
+  // ============================================
+  // EFFECT: CERRAR EMOJI PICKER AL HACER CLIC FUERA
+  // ============================================
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
@@ -175,6 +190,9 @@ export default function ChatWidget() {
     }
   }, [])
 
+  // ============================================
+  // CARGAR CONVERSACIÓN EXISTENTE
+  // ============================================
   const loadConversation = async (id: string) => {
     try {
       const res = await fetch(`/api/chat/messages?conversationId=${id}`)
@@ -189,9 +207,7 @@ export default function ChatWidget() {
         }
       } else if (data.error === 'Conversation not found') {
         console.log('🗑️ Conversación no encontrada, limpiando ID inválido')
-        localStorage.removeItem('nick_chat_conversation_id')
-        setConversationId(null)
-        setStep('form')
+        resetToForm()
       }
     } catch (error) {
       console.error('Error loading conversation:', error)
@@ -368,10 +384,20 @@ export default function ChatWidget() {
     const pollMessages = async () => {
       try {
         const res = await fetch(`/api/chat/messages?conversationId=${conversationId}&_=${Date.now()}`)
+        
+        // Si la conversación no existe (404), resetear el widget
+        if (res.status === 404) {
+          console.log('🗑️ Conversación no encontrada (404), reseteando widget')
+          resetToForm()
+          return
+        }
+        
         const data = await res.json()
         
         if (data.success) {
           setMessages(data.messages)
+        } else if (data.error === 'Conversation not found') {
+          resetToForm()
         }
       } catch (error) {
         console.error('Error en polling:', error)

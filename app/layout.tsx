@@ -1,145 +1,220 @@
-import type { Metadata, Viewport } from 'next'
-import { Nunito, Montserrat } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { ModalProvider } from '@/context/modal-context'
-import Script from 'next/script'
-import './globals.css'
+"use client"
 
-const nunito = Nunito({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  weight: ['400', '500', '600', '700', '800', '900'],
-})
+import { useState, useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
+import Link from "next/link"
+import { 
+  LayoutDashboard, Users, MessageCircle, LogOut, Menu, X
+} from "lucide-react"
 
-const montserrat = Montserrat({
-  subsets: ['latin'],
-  variable: '--font-display',
-  weight: ['700', '800', '900'],
-})
+const ADMIN_PASSWORD = "nickadmin2025"
 
-export const metadata: Metadata = {
-  title: 'Nickelodeon Hotels & Resorts | Vacaciones de Lujo Todo Incluido',
-  description: 'Disfruta de vacaciones inolvidables en Nick Resorts con Bob Esponja, PAW Patrol, slime, gastronomía gourmet y todo incluido en el Caribe.',
-  keywords: [
-    'Nickelodeon Resort',
-    'vacaciones familiares',
-    'todo incluido',
-    'Caribe',
-    'Bob Esponja',
-    'PAW Patrol',
-    'slime',
-    'resort de lujo',
-    'Punta Cana',
-    'Riviera Maya',
-    'Nick Resorts',
-  ],
-  authors: [{ name: 'Nick Resorts' }],
-  metadataBase: new URL('https://nick-resorts.vercel.app'),
-  alternates: {
-    canonical: '/',
-  },
-  openGraph: {
-    title: 'Nickelodeon Hotels & Resorts | Vacaciones de Lujo Todo Incluido',
-    description: 'Disfruta de vacaciones inolvidables en Nick Resorts con Bob Esponja, PAW Patrol, slime, gastronomía gourmet y todo incluido en el Caribe.',
-    type: 'website',
-    locale: 'es_ES',
-    siteName: 'Nick Resorts',
-    images: [
-      {
-        url: '/og-image.jpg',
-        width: 1200,
-        height: 630,
-        alt: 'Nick Resorts - Vacaciones de lujo en el Caribe',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Nickelodeon Hotels & Resorts | Vacaciones de Lujo Todo Incluido',
-    description: 'Disfruta de vacaciones inolvidables en Nick Resorts con Bob Esponja, PAW Patrol, slime, gastronomía gourmet y todo incluido en el Caribe.',
-    images: ['/og-image.jpg'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-  icons: {
-    icon: [
-      {
-        url: '/favicon.ico',
-        sizes: 'any',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
-  manifest: '/site.webmanifest',
-}
-
-export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
-  maximumScale: 5,
-  userScalable: true,
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FF6B00' },
-    { media: '(prefers-color-scheme: dark)', color: '#E55A00' },
-  ],
-}
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+function AdminSidebar({ isOpen, onClose, unreadCount }: { isOpen: boolean; onClose: () => void; unreadCount: number }) {
+  const pathname = usePathname()
+  
+  const navItems = [
+    { name: "Dashboard", href: "/admin", icon: LayoutDashboard },
+    { name: "Leads", href: "/admin", icon: Users },
+    { name: "Chat", href: "/admin/chat", icon: MessageCircle },
+  ]
+  
   return (
-    <html 
-      lang="es" 
-      className={`${nunito.variable} ${montserrat.variable} scroll-smooth`}
-      suppressHydrationWarning
-    >
-      <head>
-        {/* Facebook Pixel - Nick Resorts */}
-        <Script
-          id="facebook-pixel"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              !function(f,b,e,v,n,t,s)
-              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-              n.queue=[];t=b.createElement(e);t.async=!0;
-              t.src=v;s=b.getElementsByTagName(e)[0];
-              s.parentNode.insertBefore(t,s)}(window, document,'script',
-              'https://connect.facebook.net/en_US/fbevents.js');
-              fbq('init', 'TU_PIXEL_ID_AQUI');
-              fbq('track', 'PageView');
-            `,
-          }}
-        />
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: 'none' }}
-            src="https://www.facebook.com/tr?id=TU_PIXEL_ID_AQUI&ev=PageView&noscript=1"
-            alt="facebook-pixel"
-          />
-        </noscript>
-      </head>
-      <body 
-        className="font-sans antialiased bg-background text-foreground"
-        suppressHydrationWarning
-      >
-        <ModalProvider>
+    <>
+      {isOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={onClose} />
+      )}
+      
+      <aside className={`
+        fixed top-0 left-0 h-full bg-white shadow-xl z-50 transition-transform duration-300
+        md:translate-x-0 md:w-64 md:relative
+        ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full'}
+      `}>
+        <div className="p-6 border-b">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-r from-[#FF6B00] to-[#3DB54A] rounded-lg">
+              <span className="text-white font-bold text-sm block text-center leading-8">NR</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-[#FF6B00]">Nick Resorts</h2>
+              <p className="text-xs text-gray-500">Panel de Admin</p>
+            </div>
+          </div>
+        </div>
+        
+        <nav className="p-4 space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                onClick={onClose}
+                className={`
+                  flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
+                  ${isActive 
+                    ? 'bg-[#FF6B00]/10 text-[#FF6B00] font-semibold shadow-sm' 
+                    : 'text-gray-700 hover:bg-gray-100'
+                  }
+                `}
+              >
+                <Icon className={`w-5 h-5 ${isActive ? 'text-[#FF6B00]' : 'text-gray-500'}`} />
+                <span className="flex-1">{item.name}</span>
+                {item.name === "Chat" && unreadCount > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
+            )
+          })}
+        </nav>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
+          <button 
+            onClick={() => {
+              localStorage.removeItem('admin_auth')
+              window.location.href = "/admin"
+            }}
+            className="flex items-center gap-3 px-4 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg w-full"
+          >
+            <LogOut className="w-5 h-5 text-gray-500" />
+            <span>Cerrar Sesión</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [password, setPassword] = useState("")
+  const [passwordError, setPasswordError] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const pathname = usePathname()
+  const router = useRouter()
+
+  // Verificar autenticación al cargar
+  useEffect(() => {
+    const auth = localStorage.getItem('admin_auth')
+    if (auth === 'true') {
+      setIsAuthenticated(true)
+    }
+  }, [])
+
+  // Obtener mensajes no leídos
+  useEffect(() => {
+    if (!isAuthenticated) return
+    
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch('/api/conversations')
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          const total = data.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0)
+          setUnreadCount(total)
+        }
+      } catch (error) {
+        console.error('Error fetching unread count:', error)
+      }
+    }
+    fetchUnreadCount()
+    const interval = setInterval(fetchUnreadCount, 5000)
+    return () => clearInterval(interval)
+  }, [isAuthenticated])
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true)
+      localStorage.setItem('admin_auth', 'true')
+      setPasswordError(false)
+      setPassword("")
+    } else {
+      setPasswordError(true)
+      setPassword("")
+    }
+  }
+
+  // Pantalla de login
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#FF6B00]/10 to-[#3DB54A]/10 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
+          <div className="flex justify-center mb-6">
+            <div className="w-20 h-20 bg-gradient-to-r from-[#FF6B00] to-[#3DB54A] rounded-full flex items-center justify-center">
+              <span className="text-3xl font-black text-white">N</span>
+            </div>
+          </div>
+          <h1 className="text-2xl font-black text-center mb-2" style={{ color: "#FF6B00" }}>
+            NICK RESORTS
+          </h1>
+          <p className="text-center text-gray-600 mb-8 font-semibold">Panel de Administración</p>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                Contraseña de Acceso
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  setPasswordError(false)
+                }}
+                placeholder="Ingresa la contraseña"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-[#FF6B00] transition-colors"
+                autoFocus
+              />
+            </div>
+
+            {passwordError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                Contraseña incorrecta. Intenta de nuevo.
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-[#FF6B00] hover:bg-[#E55A00] text-white font-bold py-3 rounded-lg transition-colors"
+            >
+              Acceder al Panel
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // Panel con sidebar
+  return (
+    <div className="min-h-screen bg-gray-50 flex">
+      <AdminSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} unreadCount={unreadCount} />
+      
+      <div className="flex-1 min-w-0">
+        {/* Header móvil */}
+        <div className="md:hidden bg-white border-b p-4 sticky top-0 z-30 flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-gray-100 rounded-lg">
+            <Menu className="w-5 h-5 text-gray-600" />
+          </button>
+          <div>
+            <h1 className="font-bold text-[#FF6B00]">Nick Resorts</h1>
+            <p className="text-xs text-gray-500">Admin</p>
+          </div>
+        </div>
+        
+        <div className="p-4 md:p-6">
           {children}
-        </ModalProvider>
-        <Analytics />
-      </body>
-    </html>
+        </div>
+      </div>
+    </div>
   )
 }

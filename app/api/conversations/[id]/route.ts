@@ -3,19 +3,22 @@ import sql from '@/lib/neon';
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Primero eliminar mensajes
+    // ✅ IMPORTANTE: await params antes de usarlo
+    const { id } = await params;
+    
+    // Primero eliminar mensajes de esa conversación
     await sql`
       DELETE FROM messages 
-      WHERE conversation_id = ${params.id}::uuid
+      WHERE conversation_id = ${id}::uuid
     `;
     
-    // Luego eliminar conversación
+    // Luego eliminar la conversación
     await sql`
       DELETE FROM conversations 
-      WHERE id = ${params.id}::uuid
+      WHERE id = ${id}::uuid
     `;
     
     return NextResponse.json({ success: true });
