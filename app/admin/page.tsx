@@ -5,7 +5,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { 
   Download, Check, AlertCircle, Loader2, InboxIcon, Phone, Mail, Calendar, MapPin,
-  LayoutDashboard, Users, MessageCircle, LogOut, Menu, X
+  LayoutDashboard, Users, MessageCircle, LogOut, Menu, X, Trash2
 } from "lucide-react"
 
 interface Lead {
@@ -35,9 +35,12 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
   useEffect(() => {
     const fetchUnreadCount = async () => {
       try {
-        const res = await fetch('/api/chat/conversations')
+        const res = await fetch('/api/conversations')
         const data = await res.json()
-        if (data.success) {
+        if (Array.isArray(data)) {
+          const total = data.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0)
+          setUnreadCount(total)
+        } else if (data.success && data.conversations) {
           const total = data.conversations.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0)
           setUnreadCount(total)
         }
@@ -67,7 +70,6 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
         md:translate-x-0 md:w-64 md:relative
         ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full'}
       `}>
-        {/* Logo y título */}
         <div className="p-6 border-b">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-gradient-to-r from-[#FF6B00] to-[#3DB54A] rounded-lg flex items-center justify-center">
@@ -80,7 +82,6 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
           </div>
         </div>
         
-        {/* Navegación principal */}
         <nav className="p-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon
@@ -104,7 +105,6 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
                 <Icon className={`w-5 h-5 ${isActive ? 'text-[#FF6B00]' : 'text-gray-500'}`} />
                 <span className="flex-1">{item.name}</span>
                 
-                {/* Badge de notificaciones para Chat */}
                 {isChat && unreadCount > 0 && (
                   <span className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold text-white bg-red-500 rounded-full animate-pulse">
                     {unreadCount}
@@ -115,7 +115,6 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
           })}
         </nav>
         
-        {/* Sección de acceso rápido */}
         <div className="px-4 py-3 mt-2">
           <div className="bg-gradient-to-r from-[#FF6B00]/10 to-[#3DB54A]/10 rounded-xl p-3">
             <p className="text-xs text-gray-500 mb-2">Acceso rápido</p>
@@ -135,7 +134,6 @@ function Sidebar({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) 
           </div>
         </div>
         
-        {/* Cerrar Sesión */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t bg-gray-50">
           <button 
             onClick={() => {
@@ -212,24 +210,42 @@ export default function AdminPage() {
     }
   }
 
-  const markAsContacted = async (leadId: string) => {
+  // Actualizar estado del lead
+  const updateLeadStatus = async (leadId: string, newStatus: string) => {
     setUpdatingId(leadId)
     try {
       const response = await fetch('/api/leads', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: leadId, status: 'contactado' })
+        body: JSON.stringify({ id: leadId, status: newStatus })
       })
       
       if (!response.ok) throw new Error('Error al actualizar')
       
       setLeads((prev) =>
-        prev.map((lead) => (lead.id === leadId ? { ...lead, status: "contactado" } : lead))
+        prev.map((lead) => (lead.id === leadId ? { ...lead, status: newStatus } : lead))
       )
     } catch (err) {
       console.error("Error updating lead:", err)
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  // Eliminar lead
+  const deleteLead = async (leadId: string) => {
+    if (!confirm('¿Eliminar este lead permanentemente?')) return
+    
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' })
+      if (response.ok) {
+        setLeads(prev => prev.filter(lead => lead.id !== leadId))
+      } else {
+        alert('Error al eliminar el lead')
+      }
+    } catch (error) {
+      console.error('Error deleting lead:', error)
+      alert('Error al eliminar')
     }
   }
 
@@ -375,13 +391,13 @@ export default function AdminPage() {
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
               <p className="text-gray-600 font-semibold text-sm mb-1">Pendientes</p>
               <p className="text-3xl font-black text-blue-600">
-                {leads.filter((l) => l.status !== "contactado").length}
+                {leads.filter((l) => l.status === "pendiente").length}
               </p>
             </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
-              <p className="text-gray-600 font-semibold text-sm mb-1">Adultos Totales</p>
-              <p className="text-3xl font-black text-purple-600">
-                {leads.reduce((sum, l) => sum + l.adults, 0)}
+            <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-orange-500">
+              <p className="text-gray-600 font-semibold text-sm mb-1">Pendiente Pago</p>
+              <p className="text-3xl font-black text-orange-600">
+                {leads.filter((l) => l.status === "pendiente_pago").length}
               </p>
             </div>
           </div>
@@ -479,22 +495,29 @@ export default function AdminPage() {
                           <div className="text-gray-500">👶 {lead.kids} {lead.kids === 1 ? "niño" : "niños"}</div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className={`inline-block px-2 py-1 rounded-full text-xs font-bold ${
-                            lead.status === "contactado" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
-                          }`}>
-                            {lead.status === "contactado" ? "✓ Contactado" : "⏳ Pendiente"}
-                          </span>
+                          <select
+                            value={lead.status || "pendiente"}
+                            onChange={(e) => updateLeadStatus(lead.id, e.target.value)}
+                            disabled={updatingId === lead.id}
+                            className={`px-2 py-1 rounded-full text-xs font-bold border-none cursor-pointer ${
+                              lead.status === "contactado" ? "bg-green-100 text-green-700" :
+                              lead.status === "pendiente_pago" ? "bg-orange-100 text-orange-700" :
+                              "bg-yellow-100 text-yellow-700"
+                            }`}
+                          >
+                            <option value="pendiente">⏳ Pendiente</option>
+                            <option value="contactado">✓ Contactado</option>
+                            <option value="pendiente_pago">💰 Pendiente Pago</option>
+                          </select>
                         </td>
                         <td className="px-4 py-3 text-center">
-                          {lead.status !== "contactado" && (
-                            <button
-                              onClick={() => markAsContacted(lead.id)}
-                              disabled={updatingId === lead.id}
-                              className="px-3 py-1.5 bg-[#FF6B00] hover:bg-[#E55A00] disabled:bg-gray-300 text-white text-xs font-bold rounded-lg transition-colors"
-                            >
-                              {updatingId === lead.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Marcar"}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => deleteLead(lead.id)}
+                            className="px-2 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 mx-auto"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            Eliminar
+                          </button>
                         </td>
                       </tr>
                     ))}

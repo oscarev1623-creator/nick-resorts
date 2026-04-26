@@ -194,7 +194,7 @@ function AdminChatContent() {
     if (!confirm('¿Eliminar esta conversación permanentemente?')) return;
     
     try {
-      const res = await fetch(`/api/chat/delete/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/conversations/${id}`, { method: 'DELETE' })
       const data = await res.json();
       if (data.success) {
         fetchConversations();
