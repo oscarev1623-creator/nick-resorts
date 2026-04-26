@@ -101,12 +101,22 @@ export default function AdminLayout({
   const router = useRouter()
 
   // Verificar autenticación al cargar
-  useEffect(() => {
-    const auth = localStorage.getItem('admin_auth')
-    if (auth === 'true') {
-      setIsAuthenticated(true)
+ useEffect(() => {
+  // Verificar al cargar
+  const auth = localStorage.getItem('admin_auth')
+  if (auth === 'true') {
+    setIsAuthenticated(true)
+  }
+  
+  // Escuchar cambios en localStorage (por si se cierra sesión en otra pestaña)
+  const handleStorageChange = (e: StorageEvent) => {
+    if (e.key === 'admin_auth') {
+      setIsAuthenticated(e.newValue === 'true')
     }
-  }, [])
+  }
+  window.addEventListener('storage', handleStorageChange)
+  return () => window.removeEventListener('storage', handleStorageChange)
+}, [])
 
   // Obtener mensajes no leídos
   useEffect(() => {

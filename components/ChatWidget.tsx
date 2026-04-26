@@ -7,13 +7,9 @@ import {
   Minimize2, Paperclip, FileText, Loader2, Smile, Sparkles
 } from 'lucide-react'
 
-// ============================================
-// 🎨 COLORES NICK RESORTS
-// ============================================
 const NICK_ORANGE = '#FF6B00'
 const NICK_GREEN = '#3DB54A'
 const NICK_GRADIENT = 'from-[#FF6B00] to-[#FF8C42]'
-const SLIME_GREEN = '#3DB54A'
 
 function getAgentGradient(color: string | undefined) {
   const gradients: Record<string, string> = {
@@ -29,42 +25,30 @@ function getAgentGradient(color: string | undefined) {
   return gradients[color || 'orange'] || NICK_GRADIENT
 }
 
-// ============================================
-// 😊 LISTA DE EMOJIS COMUNES
-// ============================================
 const EMOJI_LIST = [
   '😊', '😂', '❤️', '👍', '🙏', '🎉', '🔥', '💯', '✅', '⭐',
   '🤔', '👋', '💪', '🙌', '👏', '💸', '💰', '📄', '📱', '💻',
   '🏠', '🚗', '📈', '📉', '💡', '🔒', '⚠️', '❌', '✔️', 'ℹ️', '💚', '🧡'
 ]
 
-// ============================================
-// 🎨 FUNCIÓN PARA FORMATEAR TEXTO CON MARKDOWN
-// ============================================
 const formatMessage = (text: string) => {
   if (!text) return text
-  
   let formattedText = text
-  
   formattedText = formattedText
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-  
   formattedText = formattedText.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   formattedText = formattedText.replace(/\*([^*]+)\*/g, '<em>$1</em>')
   formattedText = formattedText.replace(/__([^_]+)__/g, '<u>$1</u>')
   formattedText = formattedText.replace(/~~([^~]+)~~/g, '<del>$1</del>')
   formattedText = formattedText.replace(/`([^`]+)`/g, '<code class="bg-gray-200 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
-  
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g
   formattedText = formattedText.replace(urlRegex, (url) => {
     const href = url.startsWith('www.') ? `https://${url}` : url
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline decoration-2 underline-offset-2 hover:opacity-80 break-all font-medium" style="color: inherit;">${url}</a>`
   })
-  
   formattedText = formattedText.replace(/\n/g, '<br>')
-  
   return formattedText
 }
 
@@ -91,9 +75,6 @@ export default function ChatWidget() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
 
-  // ============================================
-  // FUNCIÓN PARA RESETEAR EL WIDGET
-  // ============================================
   const resetToForm = () => {
     console.log('🔄 Reseteando widget a formulario')
     localStorage.removeItem('nick_chat_conversation_id')
@@ -104,8 +85,27 @@ export default function ChatWidget() {
   }
 
   // ============================================
-  // EFFECT: CERRAR EMOJI PICKER AL HACER CLIC FUERA
+  // VALIDAR CONVERSACIÓN EXISTENTE
   // ============================================
+  const validateConversation = async (id: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`/api/chat/messages?conversationId=${id}`)
+      if (res.status === 404) {
+        resetToForm()
+        return false
+      }
+      const data = await res.json()
+      if (!data.success || data.error === 'Conversation not found') {
+        resetToForm()
+        return false
+      }
+      return true
+    } catch (error) {
+      console.error('Error validating conversation:', error)
+      return false
+    }
+  }
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
@@ -122,9 +122,6 @@ export default function ChatWidget() {
     inputRef.current?.focus()
   }
 
-  // ============================================
-  // AUTO-INICIO DESDE EMAIL O PARÁMETROS
-  // ============================================
   useEffect(() => {
     const timer = setTimeout(() => {
       const urlParams = new URLSearchParams(window.location.search)
@@ -132,14 +129,10 @@ export default function ChatWidget() {
       const chatEmail = urlParams.get('chat_email')
       const conversationIdParam = urlParams.get('conversation_id')
       
-      console.log('🔍 [Nick Chat] Parámetros:', { chatName, chatEmail, conversationId: conversationIdParam })
-      
       if (chatName && chatEmail) {
         if (conversationIdParam) {
-          console.log('📂 Cargando conversación existente:', conversationIdParam)
           localStorage.setItem('nick_chat_conversation_id', conversationIdParam)
           setConversationId(conversationIdParam)
-          
           fetch(`/api/chat/messages?conversationId=${conversationIdParam}`)
             .then(res => res.json())
             .then(data => {
@@ -150,25 +143,18 @@ export default function ChatWidget() {
               }
             })
         } else {
-          console.log('📝 Sin conversationId, abriendo formulario')
           setIsOpen(true)
         }
-        
         window.history.replaceState({}, document.title, window.location.pathname)
       }
     }, 300)
-    
     return () => clearTimeout(timer)
   }, [])
 
-  // ============================================
-  // CARGAR DATOS GUARDADOS LOCALMENTE
-  // ============================================
   useEffect(() => {
     const savedName = localStorage.getItem('nick_chat_user_name')
     const savedEmail = localStorage.getItem('nick_chat_user_email')
     const savedPhone = localStorage.getItem('nick_chat_user_phone')
-    
     if (savedName && savedEmail) {
       setFormData({
         name: savedName,
@@ -182,17 +168,23 @@ export default function ChatWidget() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // ============================================
+  // CARGAR CONVERSACIÓN GUARDADA CON VALIDACIÓN
+  // ============================================
   useEffect(() => {
-    const savedId = localStorage.getItem('nick_chat_conversation_id')
-    if (savedId && !conversationId) {
-      loadConversation(savedId)
-      setIsOpen(true)
+    const loadSavedConversation = async () => {
+      const savedId = localStorage.getItem('nick_chat_conversation_id')
+      if (savedId && !conversationId) {
+        const isValid = await validateConversation(savedId)
+        if (isValid) {
+          loadConversation(savedId)
+          setIsOpen(true)
+        }
+      }
     }
+    loadSavedConversation()
   }, [])
 
-  // ============================================
-  // CARGAR CONVERSACIÓN EXISTENTE
-  // ============================================
   const loadConversation = async (id: string) => {
     try {
       const res = await fetch(`/api/chat/messages?conversationId=${id}`)
@@ -206,7 +198,6 @@ export default function ChatWidget() {
           setAssignedAgent(data.conversation.assignedTo)
         }
       } else if (data.error === 'Conversation not found') {
-        console.log('🗑️ Conversación no encontrada, limpiando ID inválido')
         resetToForm()
       }
     } catch (error) {
@@ -214,9 +205,6 @@ export default function ChatWidget() {
     }
   }
 
-  // ============================================
-  // INICIAR CONVERSACIÓN Y CREAR LEAD
-  // ============================================
   const startConversation = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.name || !formData.email) return
@@ -227,7 +215,6 @@ export default function ChatWidget() {
       localStorage.setItem('nick_chat_user_email', formData.email)
       localStorage.setItem('nick_chat_user_phone', formData.phone)
 
-      // Crear lead en la base de datos
       const leadResponse = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -248,7 +235,6 @@ export default function ChatWidget() {
 
       const leadData = await leadResponse.json()
       
-      // Iniciar conversación en el chat
       const res = await fetch('/api/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -265,7 +251,6 @@ export default function ChatWidget() {
         setConversationId(data.conversationId)
         localStorage.setItem('nick_chat_conversation_id', data.conversationId)
         
-        // Asignar asesor
         const assignRes = await fetch('/api/chat/assign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -289,9 +274,6 @@ export default function ChatWidget() {
     }
   }
 
-  // ============================================
-  // ENVIAR MENSAJE
-  // ============================================
   const sendMessage = async () => {
     if (!input.trim() || !conversationId) return
 
@@ -319,9 +301,6 @@ export default function ChatWidget() {
     }
   }
 
-  // ============================================
-  // SUBIR ARCHIVOS
-  // ============================================
   const uploadFile = async (file: File) => {
     if (!conversationId) return
 
@@ -375,9 +354,6 @@ export default function ChatWidget() {
     }
   }
 
-  // ============================================
-  // POLLING PARA ACTUALIZAR MENSAJES
-  // ============================================
   useEffect(() => {
     if (!conversationId || step !== 'chat') return
 
@@ -385,9 +361,7 @@ export default function ChatWidget() {
       try {
         const res = await fetch(`/api/chat/messages?conversationId=${conversationId}&_=${Date.now()}`)
         
-        // Si la conversación no existe (404), resetear el widget
         if (res.status === 404) {
-          console.log('🗑️ Conversación no encontrada (404), reseteando widget')
           resetToForm()
           return
         }
@@ -442,9 +416,6 @@ export default function ChatWidget() {
     )
   }
 
-  // ============================================
-  // BOTÓN FLOTANTE (CERRADO)
-  // ============================================
   if (!isOpen) {
     return (
       <button
@@ -457,9 +428,6 @@ export default function ChatWidget() {
     )
   }
 
-  // ============================================
-  // WIDGET ABIERTO
-  // ============================================
   return (
     <AnimatePresence>
       <motion.div
@@ -469,7 +437,6 @@ export default function ChatWidget() {
         transition={{ duration: 0.2 }}
         className="fixed inset-0 md:inset-auto md:bottom-6 md:right-6 z-50 md:w-[380px] md:h-[550px] bg-white md:rounded-2xl shadow-2xl border border-gray-200 overflow-hidden flex flex-col"
       >
-        {/* HEADER con gradiente Naranja Nick */}
         <div className={`bg-gradient-to-r ${getAgentGradient(assignedAgent?.color)} px-4 py-3 flex items-center justify-between shrink-0`}>
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -485,10 +452,10 @@ export default function ChatWidget() {
             </div>
           </div>
           <div className="flex gap-1">
-            <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+            <button onClick={() => setIsMinimized(!isMinimized)} className="p-1.5 hover:bg-white/20 rounded-lg">
               <Minimize2 className="w-4 h-4 text-white" />
             </button>
-            <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+            <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/20 rounded-lg">
               <X className="w-4 h-4 text-white" />
             </button>
           </div>
@@ -516,42 +483,18 @@ export default function ChatWidget() {
                     </div>
                     <form onSubmit={startConversation} className="space-y-3">
                       <div className="relative">
-                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Tu nombre *" 
-                          value={formData.name} 
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
-                          required 
-                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
-                        />
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input type="text" placeholder="Tu nombre *" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00]" />
                       </div>
                       <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input 
-                          type="email" 
-                          placeholder="Tu correo *" 
-                          value={formData.email} 
-                          onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
-                          required 
-                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
-                        />
+                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input type="email" placeholder="Tu correo *" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} required className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00]" />
                       </div>
                       <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <input 
-                          type="tel" 
-                          placeholder="Tu teléfono" 
-                          value={formData.phone} 
-                          onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
-                          className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00] focus:border-transparent outline-none" 
-                        />
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input type="tel" placeholder="Tu teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-[#FF6B00]" />
                       </div>
-                      <button 
-                        type="submit" 
-                        disabled={isLoading} 
-                        className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white py-2.5 rounded-xl font-semibold text-sm hover:from-[#E55A00] hover:to-[#FF6B00] transition-all disabled:opacity-50"
-                      >
+                      <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-[#FF6B00] to-[#FF8C42] text-white py-2.5 rounded-xl font-semibold text-sm hover:from-[#E55A00] hover:to-[#FF6B00] transition-all disabled:opacity-50">
                         {isLoading ? 'Conectando...' : 'Iniciar conversación'}
                       </button>
                     </form>
@@ -559,7 +502,6 @@ export default function ChatWidget() {
                 )
               ) : (
                 <>
-                  {/* MENSAJES */}
                   <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-gray-50">
                     {messages.map((msg) => (
                       <div key={msg.id} className={`flex ${msg.senderType === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -570,12 +512,7 @@ export default function ChatWidget() {
                             ? 'bg-gray-200 text-gray-500 italic' 
                             : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none shadow-sm'
                         }`}>
-                          {msg.message && (
-                            <span 
-                              dangerouslySetInnerHTML={{ __html: formatMessage(msg.message) }}
-                              className="break-words"
-                            />
-                          )}
+                          {msg.message && <span dangerouslySetInnerHTML={{ __html: formatMessage(msg.message) }} className="break-words" />}
                           {renderFilePreview(msg)}
                           <div className={`text-[10px] mt-1 ${msg.senderType === 'user' ? 'text-orange-100' : 'text-gray-400'}`}>
                             {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -594,7 +531,6 @@ export default function ChatWidget() {
                     <div ref={messagesEndRef} />
                   </div>
 
-                  {/* INPUT */}
                   <div className="border-t p-3 flex gap-2 bg-white shrink-0">
                     <input type="file" ref={fileInputRef} accept="image/*,.pdf,.doc,.docx" className="hidden" onChange={(e) => { if (e.target.files?.[0]) { uploadFile(e.target.files[0]); e.target.value = '' } }} />
                     <button onClick={() => fileInputRef.current?.click()} className="p-2 text-gray-500 hover:text-[#FF6B00] hover:bg-orange-50 rounded-xl transition-colors">
@@ -602,34 +538,16 @@ export default function ChatWidget() {
                     </button>
                     
                     <div className="flex-1 bg-gray-100 rounded-3xl px-4 py-2 relative">
-                      <input 
-                        ref={inputRef} 
-                        type="text" 
-                        value={input} 
-                        onChange={(e) => setInput(e.target.value)} 
-                        onKeyPress={(e) => e.key === 'Enter' && sendMessage()} 
-                        placeholder="Escribe tu mensaje..." 
-                        className="w-full bg-transparent text-sm outline-none placeholder-gray-500 pr-8" 
-                      />
-                      
+                      <input ref={inputRef} type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && sendMessage()} placeholder="Escribe tu mensaje..." className="w-full bg-transparent text-sm outline-none placeholder-gray-500 pr-8" />
                       <div className="absolute right-2 top-1/2 -translate-y-1/2" ref={emojiPickerRef}>
-                        <button
-                          type="button"
-                          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                        >
+                        <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-1 hover:bg-gray-200 rounded-full">
                           <Smile className="w-4 h-4 text-gray-500" />
                         </button>
-                        
                         {showEmojiPicker && (
                           <div className="absolute bottom-full right-0 mb-2 bg-white rounded-lg shadow-xl border border-gray-200 p-2 w-64 z-50">
                             <div className="grid grid-cols-8 gap-1">
                               {EMOJI_LIST.map((emoji, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => insertEmoji(emoji)}
-                                  className="p-1.5 text-xl hover:bg-gray-100 rounded transition-colors"
-                                >
+                                <button key={index} onClick={() => insertEmoji(emoji)} className="p-1.5 text-xl hover:bg-gray-100 rounded">
                                   {emoji}
                                 </button>
                               ))}
@@ -647,7 +565,6 @@ export default function ChatWidget() {
               )}
             </div>
             
-            {/* FOOTER */}
             <div className="bg-gray-50 px-4 py-2 border-t text-center shrink-0">
               <p className="text-[10px] text-gray-400">💚🧡 Nick Resorts - Donde los sueños se vuelven slime</p>
             </div>
