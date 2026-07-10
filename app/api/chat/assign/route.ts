@@ -5,14 +5,21 @@ export async function POST(request: NextRequest) {
   try {
     const { conversationId } = await request.json();
     
-    // Buscar el asesor con menos conversaciones activas
+    // Reparto balanceado + prioridad al asesor con mas tiempo sin nueva asignacion.
     const agents = await sql`
-      SELECT a.*, COUNT(c.id) as active_count
+      SELECT
+        a.*,
+        COUNT(c_active.id) as active_count,
+        MAX(c_all.created_at) as last_assignment_at
       FROM agents a
-      LEFT JOIN conversations c ON c.assigned_to = a.id AND c.status = 'active'
+      LEFT JOIN conversations c_active
+        ON c_active.assigned_to = a.id
+        AND c_active.status = 'active'
+      LEFT JOIN conversations c_all
+        ON c_all.assigned_to = a.id
       WHERE a.is_active = true
       GROUP BY a.id
-      ORDER BY active_count ASC
+      ORDER BY active_count ASC, last_assignment_at ASC NULLS FIRST, a.created_at ASC
       LIMIT 1
     `;
     

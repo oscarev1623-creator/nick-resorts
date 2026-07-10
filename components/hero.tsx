@@ -62,6 +62,20 @@ export function Hero() {
         aria-hidden="true"
       />
 
+      {/* 🧪 GOTAS DE SLIME - Esquina superior derecha */}
+      <div className="absolute top-8 right-8 z-20 flex gap-3 pointer-events-none">
+        <div className="w-4 h-8 rounded-b-full bg-[#3DB54A] animate-slime-drip shadow-md" />
+        <div className="w-3 h-6 rounded-b-full bg-[#3DB54A]/80 animate-slime-drip-delay-1 shadow-md" />
+        <div className="w-2 h-4 rounded-b-full bg-[#3DB54A]/60 animate-slime-drip-delay-2 shadow-md" />
+      </div>
+
+      {/* 🧪 GOTAS DE SLIME - Esquina inferior izquierda */}
+      <div className="absolute bottom-20 left-8 z-20 flex gap-2 pointer-events-none">
+        <div className="w-3 h-6 rounded-b-full bg-[#3DB54A]/70 animate-slime-drip-delay-2 shadow-md" />
+        <div className="w-5 h-10 rounded-b-full bg-[#3DB54A] animate-slime-drip shadow-md" />
+        <div className="w-2 h-5 rounded-b-full bg-[#3DB54A]/50 animate-slime-drip-delay-1 shadow-md" />
+      </div>
+
       {/* Content */}
       <div className="relative z-20 flex flex-col justify-center flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-28 pb-20">
         <div className="max-w-2xl">
@@ -169,7 +183,7 @@ export function Hero() {
             </span>
           </h1>
 
-          {/* Subtitle */}
+          {/* Subtitle - SLIME NEÓN CON BURBUJAS Y GLOW */}
           <p
             className="animate-fade-in-up animate-delay-400 text-base sm:text-lg text-white/90 leading-relaxed mb-10 text-pretty max-w-lg"
             style={{ textShadow: "0 1px 8px rgba(0,0,0,0.40)" }}
@@ -177,8 +191,13 @@ export function Hero() {
             Vacaciones Todo Incluido en el Caribe.
             <br className="hidden sm:block" />
             Donde la elegancia se encuentra con el{" "}
-            <span className="font-extrabold text-white underline decoration-wavy decoration-white/60 underline-offset-2">
+            <span className="relative inline-block font-black text-[#3DB54A] [text-shadow:_0_0_10px_#3DB54A,_0_0_20px_#3DB54A,_0_0_40px_#3DB54A,_0_0_80px_#3DB54A] animate-pulse">
               slime.
+              <span className="absolute inset-0 blur-xl bg-[#3DB54A]/20 -z-10" />
+              {/* Burbujitas decorativas alrededor */}
+              <span className="absolute -top-2 -right-4 w-2 h-2 bg-[#8BC34A] rounded-full animate-bounce" />
+              <span className="absolute -bottom-1 -left-3 w-1.5 h-1.5 bg-[#3DB54A] rounded-full animate-pulse" />
+              <span className="absolute top-1 -right-6 w-1 h-1 bg-[#FFD700] rounded-full animate-ping" />
             </span>
           </p>
 

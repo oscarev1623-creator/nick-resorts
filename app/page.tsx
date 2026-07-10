@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Header } from "@/components/header"
 import { Hero } from "@/components/hero"
 import { Perks } from "@/components/perks"
@@ -15,6 +15,15 @@ import { ReservationContext } from "@/context/reservation-context"
 
 export default function HomePage() {
   const [isReservationOpen, setIsReservationOpen] = useState(false)
+
+  useEffect(() => {
+    // Verificar si se debe abrir el modal de pago
+    const shouldOpenPayment = localStorage.getItem('nick_open_payment_modal')
+    if (shouldOpenPayment === 'true') {
+      localStorage.removeItem('nick_open_payment_modal')
+      setIsReservationOpen(true)
+    }
+  }, [])
 
   return (
     <ReservationContext.Provider value={{ isOpen: isReservationOpen, setIsOpen: setIsReservationOpen }}>

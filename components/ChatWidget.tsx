@@ -74,6 +74,38 @@ export default function ChatWidget() {
   const inputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const emojiPickerRef = useRef<HTMLDivElement>(null)
+  const previousMessagesLengthRef = useRef<number>(0)
+  const ADVISOR_SENDER_TYPE = 'agent'
+
+  // ============================================
+  // EXPONER FUNCIÓN GLOBAL PARA ABRIR CHAT
+  // ============================================
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).openNickChat = () => {
+        console.log('📱 [ChatWidget] openNickChat fue llamado!')
+        setIsOpen(true)
+      }
+      console.log('✅ [ChatWidget] window.openNickChat ha sido registrado')
+    }
+  }, [])
+
+  // ============================================
+  // LISTENER PARA EVENTO PERSONALIZADO
+  // ============================================
+  useEffect(() => {
+    const handleCustomEvent = () => {
+      console.log('📱 [ChatWidget] Evento openNickChatEvent recibido')
+      setIsOpen(true)
+    }
+    
+    window.addEventListener('openNickChatEvent', handleCustomEvent)
+    console.log('✅ [ChatWidget] Listener de openNickChatEvent registrado')
+    
+    return () => {
+      window.removeEventListener('openNickChatEvent', handleCustomEvent)
+    }
+  }, [])
 
   const resetToForm = () => {
     console.log('🔄 Reseteando widget a formulario')
@@ -84,9 +116,6 @@ export default function ChatWidget() {
     setAssignedAgent(null)
   }
 
-  // ============================================
-  // VALIDAR CONVERSACIÓN EXISTENTE
-  // ============================================
   const validateConversation = async (id: string): Promise<boolean> => {
     try {
       const res = await fetch(`/api/chat/messages?conversationId=${id}`)
@@ -165,6 +194,7 @@ export default function ChatWidget() {
   }, [])
 
   useEffect(() => {
+    previousMessagesLengthRef.current = messages.length
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
@@ -173,17 +203,91 @@ export default function ChatWidget() {
   // ============================================
   useEffect(() => {
     const loadSavedConversation = async () => {
-      const savedId = localStorage.getItem('nick_chat_conversation_id')
-      if (savedId && !conversationId) {
-        const isValid = await validateConversation(savedId)
-        if (isValid) {
-          loadConversation(savedId)
-          setIsOpen(true)
+      console.log('🔍 Cargando conversación guardada...')
+
+      let savedId = localStorage.getItem('nick_chat_conversation_id')
+      const leadId = localStorage.getItem('nick_chat_lead_id')
+      
+      if (!savedId && leadId) {
+        try {
+          const res = await fetch(`/api/chat/find-by-lead?leadId=${leadId}`)
+          const data = await res.json()
+          if (data.success && data.conversationId) {
+            savedId = data.conversationId
+            localStorage.setItem('nick_chat_conversation_id', savedId)
+            console.log('✅ Conversación encontrada por leadId:', savedId)
+          } else {
+            console.log('❌ No se encontró conversación para leadId:', leadId)
+          }
+        } catch (error) {
+          console.error('Error buscando por leadId:', error)
         }
       }
+
+      if (savedId && !conversationId) {
+        console.log('📥 Cargando conversación ID:', savedId)
+        const res = await fetch(`/api/chat/messages?conversationId=${savedId}`)
+        const data = await res.json()
+
+        if (data.success && data.messages) {
+          setConversationId(savedId)
+          setMessages(data.messages)
+          setStep('chat')
+          localStorage.removeItem('nick_chat_lead_id')
+          console.log('🔥 Abriendo chat automáticamente')
+          setIsOpen(true)
+        } else {
+          console.log('❌ Error cargando mensajes:', data.error)
+          if (data.error === 'Conversation not found') {
+            resetToForm()
+          }
+        }
+      } else if (!savedId && !conversationId) {
+        setStep('form')
+      }
     }
+
     loadSavedConversation()
   }, [])
+
+  // ============================================
+  // CUANDO SE ABRE EL CHAT, VERIFICAR SI HAY LEADID PENDIENTE
+  // ============================================
+  useEffect(() => {
+    if (!isOpen || step !== 'form') return
+
+    const leadId = localStorage.getItem('nick_chat_lead_id')
+    if (!leadId) return
+
+    console.log('🔥 LeadId pendiente encontrado al abrir chat:', leadId)
+
+    const loadFromLeadId = async () => {
+      try {
+        const res = await fetch(`/api/chat/find-by-lead?leadId=${leadId}`)
+        const data = await res.json()
+        
+        if (data.success && data.conversationId) {
+          const convId = data.conversationId
+          localStorage.setItem('nick_chat_conversation_id', convId)
+          localStorage.removeItem('nick_chat_lead_id')
+          
+          const msgRes = await fetch(`/api/chat/messages?conversationId=${convId}`)
+          const msgData = await msgRes.json()
+          
+          if (msgData.success) {
+            setConversationId(convId)
+            setMessages(msgData.messages)
+            setStep('chat')
+            console.log('✅ Conversación cargada desde leadId')
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando desde leadId:', error)
+      }
+    }
+
+    loadFromLeadId()
+  }, [isOpen, step])
 
   const loadConversation = async (id: string) => {
     try {
@@ -215,57 +319,94 @@ export default function ChatWidget() {
       localStorage.setItem('nick_chat_user_email', formData.email)
       localStorage.setItem('nick_chat_user_phone', formData.phone)
 
-      const leadResponse = await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          full_name: formData.name,
-          email: formData.email,
-          phone: formData.phone || '',
-          destination: 'punta-cana',
-          arrival_date: new Date().toISOString().split('T')[0],
-          departure_date: new Date(Date.now() + 7*86400000).toISOString().split('T')[0],
-          adults: 1,
-          kids: 0,
-          message: `Cliente inició conversación por chat. Teléfono: ${formData.phone || 'No proporcionado'}`,
-          accept_promos: true,
-          status: 'PENDING'
-        })
-      })
+      let leadData = null
+      try {
+        const searchRes = await fetch(`/api/leads?email=${encodeURIComponent(formData.email)}`)
+        const searchData = await searchRes.json()
+        if (searchData && searchData.length > 0) {
+          leadData = searchData[0]
+          console.log('✅ Lead existente encontrado:', leadData.id)
+        }
+      } catch (error) {
+        console.log('No se encontró lead existente, creando uno nuevo')
+      }
 
-      const leadData = await leadResponse.json()
-      
-      const res = await fetch('/api/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          leadId: leadData.id
+      if (!leadData) {
+        const leadResponse = await fetch('/api/leads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            full_name: formData.name,
+            email: formData.email,
+            phone: formData.phone || '',
+            destination: 'punta-cana',
+            arrival_date: new Date().toISOString().split('T')[0],
+            departure_date: new Date(Date.now() + 7*86400000).toISOString().split('T')[0],
+            adults: 1,
+            kids: 0,
+            message: `Cliente inició conversación por chat. Teléfono: ${formData.phone || 'No proporcionado'}`,
+            accept_promos: true,
+            status: 'PENDING'
+          })
         })
-      })
-      const data = await res.json()
+        leadData = await leadResponse.json()
+        console.log('✅ Nuevo lead creado:', leadData.id)
+      }
 
-      if (data.success) {
-        setConversationId(data.conversationId)
-        localStorage.setItem('nick_chat_conversation_id', data.conversationId)
+      let conversationId = null
+      try {
+        const convRes = await fetch(`/api/chat/find-by-lead?leadId=${leadData.id}`)
+        const convData = await convRes.json()
+        if (convData.success && convData.conversationId) {
+          conversationId = convData.conversationId
+          console.log('✅ Conversación existente encontrada:', conversationId)
+        }
+      } catch (error) {
+        console.log('No se encontró conversación existente')
+      }
+
+      if (!conversationId) {
+        const res = await fetch('/api/chat/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            phone: formData.phone,
+            leadId: leadData.id
+          })
+        })
+        const data = await res.json()
+        conversationId = data.conversationId
+        console.log('✅ Nueva conversación creada:', conversationId)
+      }
+
+      if (conversationId) {
+        setConversationId(conversationId)
+        localStorage.setItem('nick_chat_conversation_id', conversationId)
         
         const assignRes = await fetch('/api/chat/assign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationId: data.conversationId })
+          body: JSON.stringify({ conversationId: conversationId })
         })
         const assignData = await assignRes.json()
         if (assignData.success) setAssignedAgent(assignData.agent)
         
         setStep('chat')
-        setMessages([{
-          id: 'welcome',
-          message: `✨ ¡Hola ${formData.name}! ✨\n\nBienvenido a **Nick Resorts** 🧡💚\n\nUn asesor **Nick** te atenderá en breve. Mientras tanto, cuéntanos ¿cómo podemos ayudarte con tus vacaciones de ensueño? 🏖️`,
-          senderType: 'system',
-          createdAt: new Date().toISOString()
-        }])
+        
+        const msgRes = await fetch(`/api/chat/messages?conversationId=${conversationId}`)
+        const msgData = await msgRes.json()
+        if (msgData.success && msgData.messages.length > 0) {
+          setMessages(msgData.messages)
+        } else {
+          setMessages([{
+            id: 'welcome',
+            message: `✨ ¡Hola ${formData.name}! ✨\n\nBienvenido a **Nick Resorts** 🧡💚\n\nUn asesor **Nick** te atenderá en breve.`,
+            senderType: 'system',
+            createdAt: new Date().toISOString()
+          }])
+        }
       }
     } catch (error) {
       console.error('Error:', error)
@@ -360,15 +501,35 @@ export default function ChatWidget() {
     const pollMessages = async () => {
       try {
         const res = await fetch(`/api/chat/messages?conversationId=${conversationId}&_=${Date.now()}`)
-        
+
         if (res.status === 404) {
           resetToForm()
           return
         }
-        
+
         const data = await res.json()
-        
+        console.log('💬 [polling] Nuevo fetch', {
+          conversationId,
+          isOpen,
+          dataLength: data.messages?.length,
+          lastMessage: data.messages?.[data.messages.length - 1]
+        })
+
         if (data.success) {
+          const previousLength = previousMessagesLengthRef.current
+          const newLength = Array.isArray(data.messages) ? data.messages.length : 0
+          console.log('📊 [polling] previousLength:', previousLength, 'newLength:', newLength)
+          if (newLength > previousLength) {
+            const lastMessage = data.messages[newLength - 1]
+            console.log('💬 [polling] Nuevo mensaje detectado:', lastMessage)
+            if (lastMessage?.senderType === ADVISOR_SENDER_TYPE && !isOpen) {
+              console.log('🔥 [polling] Abriendo chat por nuevo mensaje del asesor')
+              setTimeout(() => {
+                console.log('🚀 [polling] setIsOpen(true)')
+                setIsOpen(true)
+              }, 1000)
+            }
+          }
           setMessages(data.messages)
         } else if (data.error === 'Conversation not found') {
           resetToForm()
@@ -382,7 +543,7 @@ export default function ChatWidget() {
     const interval = setInterval(pollMessages, 2000)
 
     return () => clearInterval(interval)
-  }, [conversationId, step])
+  }, [conversationId, step, isOpen])
 
   const renderFilePreview = (msg: any) => {
     if (!msg.fileUrl) return null
@@ -566,7 +727,7 @@ export default function ChatWidget() {
             </div>
             
             <div className="bg-gray-50 px-4 py-2 border-t text-center shrink-0">
-              <p className="text-[10px] text-gray-400">💚🧡 Nick Resorts - Donde los sueños se vuelven slime</p>
+              <p className="text-[10px] text-gray-400">Nick Resorts - Donde los sueños se vuelven slime</p>
             </div>
           </>
         )}

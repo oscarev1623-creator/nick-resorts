@@ -229,7 +229,7 @@ export default function PaquetesPage() {
                   </div>
 
                   <button
-                    onClick={openModal}
+                    onClick={() => openModal('', room.id)}
                     className="w-full bg-[#FF6B00] text-white font-bold py-3 rounded-lg hover:bg-[#E55A00] transition-colors duration-200"
                   >
                     RESERVAR
@@ -300,7 +300,7 @@ export default function PaquetesPage() {
                       </ul>
                     </div>
                     <button
-                      onClick={openModal}
+                      onClick={() => openModal(pkg.id)}
                       className="w-full bg-[#FF6B00] text-white font-bold py-3 rounded-lg hover:bg-[#E55A00] transition-colors duration-200"
                     >
                       RESERVAR PAQUETE
@@ -462,7 +462,7 @@ export default function PaquetesPage() {
 
               {/* Reserve Button */}
               <button
-                onClick={openModal}
+                onClick={() => openModal(calculator.package, calculator.room)}
                 className="w-full bg-[#FF6B00] text-white font-bold py-4 rounded-lg hover:bg-[#E55A00] transition-colors duration-200 text-lg"
               >
                 {calculator.payWithCrypto ? '💰 RESERVAR CON CRIPTO (20% OFF) 💰' : 'Solicitar Reserva'}

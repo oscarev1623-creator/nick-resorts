@@ -29,7 +29,6 @@ function AdminChatContent() {
   const [showFilters, setShowFilters] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const leadId = searchParams?.get('leadId') || null
   const leadEmail = searchParams?.get('email') || null
   const leadName = searchParams?.get('name') || null
   const leadPhone = searchParams?.get('phone') || null
@@ -103,10 +102,10 @@ function AdminChatContent() {
   }, [conversations, selectedAgent, forceUpdate, search]);
 
   useEffect(() => {
-    if (leadId && leadEmail && !creatingChat) {
+    if (leadEmail && !creatingChat) {
       openOrCreateConversation();
     }
-  }, [leadId, leadEmail]);
+  }, [leadEmail]);
 
   const fetchAgents = async () => {
     try {

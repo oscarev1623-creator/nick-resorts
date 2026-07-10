@@ -5,22 +5,35 @@ import { ReservationModal } from "@/components/reservation-modal"
 
 interface ModalContextType {
   isOpen: boolean
-  openModal: () => void
+  openModal: (packageId?: string, roomId?: string) => void
   closeModal: () => void
+  preselectedPackage: string
+  preselectedRoom: string
 }
 
 const ModalContext = createContext<ModalContextType | undefined>(undefined)
 
 export function ModalProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false)
+  const [preselectedPackage, setPreselectedPackage] = useState('')
+  const [preselectedRoom, setPreselectedRoom] = useState('presidential')
 
-  const openModal = () => setIsOpen(true)
+  const openModal = (packageId = '', roomId = 'presidential') => {
+    setPreselectedPackage(packageId)
+    setPreselectedRoom(roomId)
+    setIsOpen(true)
+  }
   const closeModal = () => setIsOpen(false)
 
   return (
-    <ModalContext.Provider value={{ isOpen, openModal, closeModal }}>
+    <ModalContext.Provider value={{ isOpen, openModal, closeModal, preselectedPackage, preselectedRoom }}>
       {children}
-      <ReservationModal isOpen={isOpen} onClose={closeModal} />
+      <ReservationModal
+        isOpen={isOpen}
+        onClose={closeModal}
+        preselectedPackage={preselectedPackage}
+        preselectedRoom={preselectedRoom}
+      />
     </ModalContext.Provider>
   )
 }

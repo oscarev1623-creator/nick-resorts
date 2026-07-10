@@ -3,7 +3,7 @@
 import { useContext, useState, useEffect } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { Menu, X } from "lucide-react"
+import { Menu, X, ShoppingCart } from "lucide-react"
 import { ReservationContext } from "@/context/reservation-context"
 
 const navLinks = [
@@ -17,12 +17,25 @@ const navLinks = [
 export function Header() {
   const [isOpen, setIsOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const [cartItems, setCartItems] = useState(0)
   const { setIsOpen: setIsReservationOpen } = useContext(ReservationContext)
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20)
     window.addEventListener("scroll", handleScroll, { passive: true })
     return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  useEffect(() => {
+    const checkCart = () => {
+      if (typeof window === 'undefined') return
+      const cart = localStorage.getItem('nick_resorts_cart')
+      setCartItems(cart ? 1 : 0)
+    }
+
+    checkCart()
+    window.addEventListener('storage', checkCart)
+    return () => window.removeEventListener('storage', checkCart)
   }, [])
 
   // Close menu on Escape key
@@ -94,6 +107,19 @@ export function Header() {
             ))}
 
             <Link
+              href="/carrito"
+              className="relative inline-flex items-center justify-center px-4 py-2 text-sm font-semibold text-foreground/80 hover:text-foreground transition-colors duration-200"
+              aria-label="Ver carrito"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {cartItems > 0 && (
+                <span className="absolute -top-2 -right-2 bg-[#FF6B00] text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
+                  {cartItems}
+                </span>
+              )}
+            </Link>
+
+            <Link
               href="#reservar"
               className="ml-4 inline-flex items-center justify-center px-6 py-2.5 rounded-full text-sm font-extrabold text-white tracking-wide shadow-md transition-all duration-200 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={{
@@ -161,6 +187,21 @@ export function Header() {
               {link.label}
             </Link>
           ))}
+          <Link
+            href="/carrito"
+            className="mt-2 flex items-center gap-2 px-3 py-3 rounded-xl text-sm font-semibold text-foreground/80 hover:text-foreground hover:bg-secondary transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            onClick={() => setIsOpen(false)}
+            tabIndex={isOpen ? 0 : -1}
+            aria-label="Ver carrito"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            Carrito
+            {cartItems > 0 && (
+              <span className="rounded-full bg-[#FF6B00] text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center animate-pulse">
+                {cartItems}
+              </span>
+            )}
+          </Link>
           <Link
             href="#reservar"
             className="mt-3 flex items-center justify-center px-6 py-3 rounded-full text-sm font-extrabold text-white tracking-wide transition-all duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white"

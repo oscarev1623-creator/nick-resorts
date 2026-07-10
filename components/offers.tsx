@@ -6,6 +6,9 @@ import { useContext, useEffect, useRef, useState } from "react"
 import { Clock, Star, Users, Heart, Sparkles, ChevronRight } from "lucide-react"
 import { useModal } from "@/context/modal-context"
 
+const formatPrice = (value: number) =>
+  new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value)
+
 const offers = [
   {
     id: "family",
@@ -251,14 +254,14 @@ function OfferCard({
             </span>
             {payWithCrypto && (
               <span className="text-sm text-gray-400 line-through">
-                ${offer.amount.toLocaleString()}
+                ${formatPrice(offer.amount)}
               </span>
             )}
             <span
               className={`text-3xl font-black ${payWithCrypto ? 'text-[#3DB54A]' : 'text-[#FF6B00]'}`}
               style={{ fontFamily: "var(--font-display, 'Montserrat', sans-serif)" }}
             >
-              ${discountedPrice.toLocaleString()}
+              ${formatPrice(discountedPrice)}
             </span>
             <span className="text-xs text-muted-foreground">
               {offer.per} por persona

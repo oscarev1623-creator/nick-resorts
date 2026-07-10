@@ -20,13 +20,32 @@ export async function GET(request: NextRequest) {
       // Todas las conversaciones (para admin)
       query = await sql`
         SELECT c.*, 
-               (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND is_read = false AND sender_type = 'cliente') as unread_count
+               (
+                 SELECT COUNT(*)
+                 FROM messages
+                 WHERE conversation_id = c.id
+                   AND is_read = false
+                   AND sender_type IN ('user', 'cliente')
+               ) as unread_count
         FROM conversations c
         ORDER BY updated_at DESC
       `;
     }
     
-    return NextResponse.json(query);
+    const mapped = query.map((conv: any) => ({
+      id: conv.id,
+      userName: conv.user_name,
+      userEmail: conv.user_email,
+      userPhone: conv.user_phone,
+      status: conv.status,
+      assignedTo: conv.assigned_to,
+      unreadCount: Number(conv.unread_count || 0),
+      lastMessage: conv.last_message || null,
+      updatedAt: conv.updated_at,
+      createdAt: conv.created_at,
+    }));
+
+    return NextResponse.json(mapped);
   } catch (error) {
     console.error('Error fetching conversations:', error);
     return NextResponse.json({ error: 'Error al cargar conversaciones' }, { status: 500 });
