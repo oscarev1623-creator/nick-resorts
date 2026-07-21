@@ -17,7 +17,7 @@ const quickLinks = [
   { name: "Paquetes", href: "/paquetes" },
   { name: "Habitaciones", href: "/habitaciones" },
   { name: "Experiencias", href: "/momentos" },
-  { name: "Contacto", href: "#" },
+  { name: "Contacto", href: "https://t.me/NickResortOficial", external: true },
 ]
 
 const socialLinks = [
@@ -184,14 +184,27 @@ export function Footer() {
             </h4>
             <nav aria-label="Enlaces rápidos" className="grid grid-cols-1 gap-2">
               {quickLinks.map((link) => (
-                <Link
-                  key={link.name}
-                  href={link.href}
-                  className="text-sm text-gray-300 hover:text-[#FF6B00] hover:translate-x-1 transition-all duration-200 flex items-center gap-1"
-                >
-                  <span className="w-1 h-1 bg-[#FF6B00] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-                  {link.name}
-                </Link>
+                link.external ? (
+                  <a
+                    key={link.name}
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-gray-300 hover:text-[#FF6B00] hover:translate-x-1 transition-all duration-200 flex items-center gap-1"
+                  >
+                    <span className="w-1 h-1 bg-[#FF6B00] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {link.name}
+                  </a>
+                ) : (
+                  <Link
+                    key={link.name}
+                    href={link.href}
+                    className="text-sm text-gray-300 hover:text-[#FF6B00] hover:translate-x-1 transition-all duration-200 flex items-center gap-1"
+                  >
+                    <span className="w-1 h-1 bg-[#FF6B00] rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                    {link.name}
+                  </Link>
+                )
               ))}
             </nav>
           </div>

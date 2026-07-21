@@ -306,6 +306,28 @@ export function ReservationModal({ isOpen, onClose, preselectedPackage = '', pre
     return ROOM_LABELS[room] || 'Habitación personalizada'
   }
 
+  // ============================================
+  // 📧 FUNCIÓN PARA ENVIAR CORREO DE CONFIRMACIÓN
+  // ============================================
+  const sendReservationEmail = async (lead: any, cart: CartItem) => {
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead, cart }),
+      });
+      
+      const data = await response.json();
+      if (data.success) {
+        console.log('📧 Correo enviado exitosamente');
+      } else {
+        console.error('❌ Error enviando correo:', data.error);
+      }
+    } catch (error) {
+      console.error('❌ Error en la petición de correo:', error);
+    }
+  };
+
   const saveLead = async () => {
     const finalAirportName = customAirport || formData.departureAirport
     const finalAirportCode = customAirport ? "" : formData.departureAirportCode
@@ -384,6 +406,10 @@ export function ReservationModal({ isOpen, onClose, preselectedPackage = '', pre
         status: 'pending',
       }
       saveCart(cartItem)
+
+      // 📧 Enviar correo de confirmación
+      await sendReservationEmail(savedLead, cartItem)
+
     } catch (error) {
       const errorMessage =
         error instanceof Error
