@@ -1,11 +1,13 @@
 "use client";
 
+import { Suspense } from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
 
-export default function PagoExitoso() {
+// Componente interno que usa useSearchParams
+function PagoExitosoContent() {
     const searchParams = useSearchParams();
     const leadId = searchParams.get('leadId');
     const [lead, setLead] = useState(null);
@@ -14,7 +16,8 @@ export default function PagoExitoso() {
         if (leadId) {
             fetch(`/api/leads/${leadId}`)
                 .then(res => res.json())
-                .then(data => setLead(data));
+                .then(data => setLead(data))
+                .catch(err => console.error('Error fetching lead:', err));
         }
     }, [leadId]);
 
@@ -30,7 +33,7 @@ export default function PagoExitoso() {
                 </p>
                 <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
                     <p className="text-sm text-gray-500">ID de reserva</p>
-                    <p className="font-mono text-sm font-bold">{leadId}</p>
+                    <p className="font-mono text-sm font-bold">{leadId || 'N/A'}</p>
                 </div>
                 <Link
                     href="/"
@@ -40,5 +43,18 @@ export default function PagoExitoso() {
                 </Link>
             </div>
         </div>
+    );
+}
+
+// Componente principal con Suspense
+export default function PagoExitosoPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#FF6B00] border-t-transparent"></div>
+            </div>
+        }>
+            <PagoExitosoContent />
+        </Suspense>
     );
 }
